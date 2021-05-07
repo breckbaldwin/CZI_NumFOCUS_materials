@@ -43,7 +43,7 @@ Onto the scripts:
 
 This requires a subscription to scopus.com which I got because of my Columbia University affiliation. I will be losing these credentials soon but am happy to run queries for other projects for the remaining month. Email fbb2116@columbia.edu with likely search strings that might be mentioned in the citations of a research publication. Hopefully your project has a unique name that functions as a rigid designator, i.e., use of the name is unique to your project which 'Stan' entirely fails at--see [https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/](https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/). 
 
-The subject categories are filtered to be biomedicine relevant. The complete list is at [https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/](https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/). 
+The subject categories are filtered to be biomedicine relevant. The complete list is at [https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/](https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/), see `categories()` function for possible values. 
 
 ```{r} 
 library(tidyr)
@@ -57,6 +57,7 @@ library(ggrepel)
 library(redux)
 library(wkb)
 
+report <- FALSE #controlsprint statements. 
 redis <- redux::hiredis()
 credentials <- read_json('Scopus_credentials.json')
 API_KEY <- credentials$API_KEY
@@ -71,24 +72,38 @@ BASE_URL = 'https://api.elsevier.com/content/search/scopus'
 
 
 get_results <-function(url) {
-  result <- redis$GET(url) # check redis first
-  if (!is.null(result)) {
-    #cat(paste("\nhitting redis for",url))
-    return(unserialize(result))
+  cache <- redis$GET(url) # check redis first
+  if (!is.null(cache)) {
+    result <- unserialize(cache)
+    if (result$status_code == 200) {
+     # cat(paste("\nhitting redis for",url))
+      return(result)
+    }
   }
-  #cat(paste("\ncache miss, querying:",url,"\n"))
-  random_wait <- abs(rnorm(1,1,1))
-  cat(paste("\nWaiting",random_wait,"seconds to be nice to webserver\n"))
+  # cat(paste("\ncache miss, querying:",url,"\n"))
+  random_wait <- abs(rnorm(1, 1, 1))
+  # cat(paste("\nWaiting", random_wait, "seconds to be nice to webserver\n"))
   Sys.sleep(random_wait)
   result <- GET(url,
-      add_headers('X-ELS-APIKey'=API_KEY,
-                    'X-ELS-Insttoken'=INSTITUTION_TOKEN))
+                add_headers('X-ELS-APIKey'=API_KEY,
+                            'X-ELS-Insttoken'=INSTITUTION_TOKEN))
   redis$SET(url,serialize(result,NULL)) # redis didn't have it above
   return(result)
 }
 
+# category mapping to description at 
+# https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/
+categories <- function() {
+  url <- 'https://api.elsevier.com/content/subject/scopus'
+  result <- get_results(url)
+  json_txt <-rawToChar(as.raw(strtoi(result$content, 16L)))
+  data <- jsonlite::fromJSON(json_txt)
+  catsDf = data$`subject-classifications`$`subject-classification`
+  return(catsDf)
+}
+
 year_start <- 2012
-year_end <- 2020
+year_end <- 2020 # want complete years or graph looks odd
 years <- year_start:year_end
 df <- data.frame(years)
 
@@ -96,12 +111,13 @@ stan_eco_q <- '(brms+AND+burkner)+OR+(gelman+AND+hoffman+AND+stan)+OR+mc-stan.or
 
 pymc_arviz_stan_eco_q <- paste('pymc*','arviz',stan_eco_q,sep='+OR+')
 
+matplotlib_q <- 'matplotlib'
+
 pkg_query <- c(pymc_arviz_stan_eco_q,
                '',
                '')
 
 pkg_query_m <- matrix(pkg_query,ncol=3)
-
 
 years <- year_start:year_end
 scopus.df <- data.frame(years)
@@ -116,6 +132,10 @@ for (i in 1:nrow(pkg_query_m) ) {
                  '&facets=subjarea(count=101)',
                  sep='')
     result <- get_results(url)
+    if (result$status_code != 200) {
+      print(sprintf("got non 200 status from query: %d", result$status_code))
+      stop()
+    }
     json_txt <-rawToChar(as.raw(strtoi(result$content, 16L)))
     data <- jsonlite::fromJSON(json_txt)
     total_count <- as.numeric(data$`search-results`$`opensearch:totalResults`)+ total_count
@@ -128,7 +148,7 @@ for (i in 1:nrow(pkg_query_m) ) {
       hitCount <- as.numeric(data$`search-results`$facet$category$hitCount[j])
       if (!name %in% colnames(scopus.df)) {
         scopus.df[name] <- rep(0,year_end - year_start + 1)
-#        print(paste("name=",name,", count=",hitCount))
+        #        print(paste("name=",name,", count=",hitCount))
       }
       scopus.df[name][scopus.df$years==year,] <- hitCount
       j <- j+ 1
@@ -138,7 +158,7 @@ for (i in 1:nrow(pkg_query_m) ) {
 column_names <- colnames(scopus.df)
 column_sums <- colSums(scopus.df)
 
-df_long <- gather(scopus.df,topic,yr_count,
+df_long <- gather(scopus.df, key = 'topic', value = 'yr_count',
                   column_names[2]:column_names[length(column_names)])
 
 df_long$total <- rep(0,nrow(df_long))
@@ -150,17 +170,40 @@ df_long_label <- df_long %>%
   mutate(label=if_else(years == max(years), 
                        paste(as.character(topic),total),NA_character_))
 
+
+# pulled from categories returned by 
+# unique(categories()$description)
+
+# [1] "Multidisciplinary"                            "Agricultural and Biological Sciences"        
+# [3] "Arts and Humanities"                          "Biochemistry, Genetics and Molecular Biology"
+# [5] "Business, Management and Accounting"          "Chemical Engineering"                        
+# [7] "Chemistry"                                    "Computer Science"                            
+# [9] "Decision Sciences"                            "Earth and Planetary Sciences"                
+# [11] "Economics, Econometrics and Finance"          "Energy"                                      
+# [13] "Engineering"                                  "Environmental Science"                       
+# [15] "Immunology and Microbiology"                  "Materials Science"                           
+# [17] "Mathematics"                                  "Medicine"                                    
+# [19] "Neuroscience"                                 "Nursing"                                     
+# [21] "Pharmacology, Toxicology and Pharmaceutics"   "Physics and Astronomy"                       
+# [23] "Psychology"                                   "Social Sciences"                             
+# [25] "Veterinary"                                   "Dentistry"                                   
+# [27] "Health Professions"                          
+
 medicine_categories = paste("Health Professions",
-                        "Pharmacology, Toxicology and Pharmaceutics",
-                        "Psychology", 
-                        "Biochemistry, Genetics and Molecular Biology",
-                        "Immunology and Microbiology",
-                        "Nursing",
-                        sep="|")
-                      
+                            "Pharmacology, Toxicology and Pharmaceutics",
+                            "Psychology", 
+                            "Biochemistry, Genetics and Molecular Biology",
+                            "Immunology and Microbiology",
+                            "Nursing",
+                            "Medicine",
+                            "Neuroscience",
+                            "Veterinary",
+                            "Agricultural and Biological Sciences",
+                            sep="|")
+
 df_long_label2 <- df_long_label[str_detect(df_long_label$topic,medicine_categories),]
 
-plot2 <- ggplot(data=df_long_label2,aes(x=years,y=yr_count,group=topic, color=topic)) + 
+plot2 <- ggplot(data=df_long_label2,aes(x = years, y = yr_count, group = topic, color = topic)) + 
   geom_line() +
   geom_point() +
   geom_label_repel(aes(label = label),
@@ -168,7 +211,11 @@ plot2 <- ggplot(data=df_long_label2,aes(x=years,y=yr_count,group=topic, color=to
   scale_color_discrete(guide = FALSE)
 
 plot2
+
 ```
+
+Scopus subject categories with total counts.   
+  
   
 ## PyPi downloads
   
@@ -252,6 +299,7 @@ print(pyPiPlot)
 rm(list=ls()) 
 ```
 
+Monthly counts of PyPi downloads. 
 
 ## Pull request aging against github for repo. 
 
@@ -343,7 +391,7 @@ for (i in 1:length(packages)) {
 
 # CRAN downloads
 
-Regression lines shown to express relative growth rates for Stan ecosystem components compared to ggplot2 and lme4.
+
 
 ```{r}
 library(cranlogs)
@@ -436,6 +484,8 @@ for (package_name in unique(mls$package[1:7])) {
 ```{r include = TRUE}
 print(log_plot1_2024_slopes_display)
 ```
+
+Regression lines shown to express relative growth rates for Stan ecosystem components compared to ggplot2 and lme4.
 
 # Page rank analysis
 
