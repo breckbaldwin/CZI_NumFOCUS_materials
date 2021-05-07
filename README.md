@@ -7,7 +7,7 @@ out so people can work on their proposals rather than make it all nice.
 
 Also, sorry that they are in R for all you Python users. I am working on my R side right now so I am learning and you will see some pretty amatueur stuff. 
 
-You can see output at https://breckbaldwin.github.io/CZI_NumFOCUS_materials/index.html which is 
+You can see output at https://breckbaldwin.github.io/CZI_NumFOCUS_materials/ which is 
 where any documentation exists.
 
 
