@@ -11,15 +11,15 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE
 
 # Point of all this
 
-I have spent a ton of time doing metrics in support of open source scientific software, Stan in particular, and I'd like to see them used more broadly if it helps people write better proposals. The current proposal that lots of NumFOCUS projects are applying for is the Chan Zuckerberg Initiative (CZI) [https://chanzuckerberg.com/wp-content/uploads/2021/03/EOSS-4-Combined-RFA-Packet.pdf](https://chanzuckerberg.com/wp-content/uploads/2021/03/EOSS-4-Combined-RFA-Packet.pdf).
+I have spent a ton of time doing metrics for open source scientific software as part of my job at Columbia. Stan has been the focus since Columbia contributes to much of the ecosystem but it includes other software as a counter point for grant proposals and progress reports. I'd like to see these metrics used more broadly if it helps people write better proposals. I am currently working on the Chan Zuckerberg Initiative (CZI) [https://chanzuckerberg.com/wp-content/uploads/2021/03/EOSS-4-Combined-RFA-Packet.pdf](https://chanzuckerberg.com/wp-content/uploads/2021/03/EOSS-4-Combined-RFA-Packet.pdf) on behalf of the Stan organization and it looks like many other NumFOCUS projects are applying as well. This document is for them. 
 
-The NumFOCUS community recently submitted a bunch of proposal to NASA's open source infrastructure call for proposals and Stan joined up with PyMC and ArviZ since we all play in the Bayesian space. I also didn't want to get the funds at the expense of PyMC and ArviZ since we are all on the same team. Towards the end of the NASA effort it was clear that 10 or so proposals were coming out of NumFOCUS--isn't AstroPy also on the same team? 
+In January of 2021 NASA had an open source infrastructure call for proposals and the Stan org joined up with PyMC and ArviZ since we all play in the Bayesian space so why not do it together? I didn't want to get the funds at the expense of PyMC and ArviZ since we are all on the same team. Towards the end of the NASA effort it became clear that around 10 proposals were coming out of NumFOCUS--isn't AstroPy also on the same team? It made me uncomfortable.
 
-The NASA proposal was a solid month's work and I had the privilege of being able to hit it pretty much full time due to my boss's generosity (Andrew Gelman). I had a think about our competitive advantage just becuase I had the cycles to focus exclusively on getting a good pitch and then I had a thunk: resources beget more resources and here I am competing with organizations that I have no interest in 'defeating' in the funding game. 
+The NASA proposal was a solid month's work and I had the privilege of being able to hit it pretty much full time due to my boss's generosity (Andrew Gelman) since I was using Columbia resources to support the Stan org at NumFOCUS. I had a think about our competitive advantage just because I had the cycles to focus exclusively on getting a good pitch and then I had a thunk: resources beget more resources to the expense of those without resources and here I am competing with organizations that I have no interest in 'defeating' in the funding game. 
 
-In response to my 'thunk' I decided to create this repo with my metrics to hopefully help other NumFOCUS project for CZI. Sorry, they are in R but that is the language I am trying to learn but it is all pretty simple stuff, just a hassle to sort out queries, API access etc that take more time than I am willing to admit. 
+In response to my 'thunk' I decided to create this repo with my metrics to hopefully help other NumFOCUS projects for CZI. Sorry, they are in R but that is the language I am trying to learn but it is all pretty simple stuff, just a hassle to sort out queries, API access etc that take more time than I am willing to admit. It also represents what 'worked', many things were tried--looking at you Google scholar and your lack of an API and way to retrieve results without getting locked out. 
 
-I'm not accepting the zero-sum quality of scientific funding and I don't want to compete with my NumFOCUS neighbors. Maybe CZI allocates more funds because of all the compelling proposals and excellent metrics justifying the projects. 
+So in short I am not accepting the zero-sum quality of scientific funding and I don't want to compete with my NumFOCUS neighbors. Maybe CZI allocates more funds because of all of the compelling proposals and excellent metrics justifying the projects. Also I'd like the scientists to keep sciencing, not scraping the web for impact data to support their work. 
 
 ## Navigation and communication
 
@@ -29,17 +29,21 @@ I am trying the discussion feature that Github has at [https://github.com/breckb
 
 For now I can be reached at fbb2116@columbia.edu or on NumFOCUS slack, @breckbaldwin. 
 
-# Planned scripts
+# The scripts
 
-All the below scripts exist, I just need to clean them up a bit. Hopefully in by May 8, 2021 so people can work use them over the weekend. NumFOCUS wants solid drafts May 10.
+Stan and Bayesian software as a whole is growing rapidly so most of the scripts focus on growth over time as a proxy for relevance to science. Your package may have different growth. There are probably inertial effects at play that bake in growth because software is getting downloaded more and automated systems like continuous integration systems are growing in popularity which apparently can drive downloads. For CRAN downloads I do add regression lines to show relative growth to baseline packages like ggplot2 to account for this. 
 
-+ CRAN downloads over time. 
+Research citations have inertial effects too and scopus.com undercounts considerably what scholar.google.com reports. 
 
-# Complete scripts
+Again this is a quick effort and not a well designed open source project. Documentation is minimal, mistakes have probably been made but I have tried to keep variables understandable and comments helpful. I welcome bug fixes and/or extensions and I hope it helps your proposal. 
+
+Onto the scripts:
 
 ## Subject distribution for Scopus.com
 
-This requires a subscription to scopus.com which I got because of my Columbia University affiliation. I will be loosing these credentials soon but am happy to run queries for other projects for the remaining month. Email fbb2116@columbia.edu with likely search strings that might be mentioned in the citations of a research publication. Hopefully your project has a unique name that functions as a regid designator, i.e., use of the name is unique to your project which 'Stan' entirely fails at--see [https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/](https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/). 
+This requires a subscription to scopus.com which I got because of my Columbia University affiliation. I will be loosing these credentials soon but am happy to run queries for other projects for the remaining month. Email fbb2116@columbia.edu with likely search strings that might be mentioned in the citations of a research publication. Hopefully your project has a unique name that functions as a rigid designator, i.e., use of the name is unique to your project which 'Stan' entirely fails at--see [https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/](https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/). 
+
+The subject categories are filtered to be biomedicine relevant. 
 
 ```{r} 
 library(tidyr)
@@ -54,6 +58,17 @@ library(redux)
 library(wkb)
 
 redis <- redux::hiredis()
+credentials <- read_json('Scopus_credentials.json')
+API_KEY <- credentials$API_KEY
+INSTITUTION_TOKEN <- credentials$INSTITUTION_TOKEN
+# Format of Scopus_credentials.json
+# {
+# "API_KEY":"XXXXXXXXXXXXXXXXXXXXXXXXXxx",
+# "INSTITUTION_TOKEN":"XXXXXXXXXXXXXXXXXXXXXXXX"
+# }
+
+BASE_URL = 'https://api.elsevier.com/content/search/scopus'
+
 
 get_results <-function(url) {
   result <- redis$GET(url) # check redis first
@@ -66,7 +81,8 @@ get_results <-function(url) {
   cat(paste("\nWaiting",random_wait,"seconds to be nice to webserver\n"))
   Sys.sleep(random_wait)
   result <- GET(url,
-      add_headers('X-ELS-APIKey'=API_KEY, 'X-ELS-Insttoken'=INSTITUTION_TOKEN))
+      add_headers('X-ELS-APIKey'=API_KEY,
+                    'X-ELS-Insttoken'=INSTITUTION_TOKEN))
   redis$SET(url,serialize(result,NULL)) # redis didn't have it above
   return(result)
 }
@@ -86,16 +102,6 @@ pkg_query <- c(pymc_arviz_stan_eco_q,
 
 pkg_query_m <- matrix(pkg_query,ncol=3)
 
-credentials <- read_json('Scopus_credentials.json')
-API_KEY <- credentials$API_KEY
-INSTITUTION_TOKEN <- credentials$INSTITUTION_TOKEN
-# Format of Scopus_credentials.json
-# {
-# "API_KEY":"XXXXXXXXXXXXXXXXXXXXXXXXXxx",
-# "INSTITUTION_TOKEN":"XXXXXXXXXXXXXXXXXXXXXXXX"
-# }
-
-BASE_URL = 'https://api.elsevier.com/content/search/scopus'
 
 years <- year_start:year_end
 scopus.df <- data.frame(years)
@@ -168,7 +174,7 @@ plot2
   
   From Google's Big Query public data set [indigo-epigram-312023](https://console.cloud.google.com/bigquery?project=indigo-epigram-312023) the download data is stored for [PyPi](https://pypi.org/). The query for 'Keras' is below:
 
-`
+```
 #standardSQL
 SELECT
   COUNT(*) AS num_downloads,
@@ -182,7 +188,7 @@ WHERE
     AND CURRENT_DATE()
 GROUP BY `month`
 ORDER BY `month` DESC
-`
+```
 
 
   
@@ -335,7 +341,9 @@ for (i in 1:length(packages)) {
 
 ```
 
+# CRAN downloads
 
+Regression lines shown to express relative growth rates for Stan ecosystem components compared to ggplot2 and lme4.
 
 ```{r}
 library(cranlogs)
@@ -429,3 +437,46 @@ for (package_name in unique(mls$package[1:7])) {
 print(log_plot1_2024_slopes_display)
 ```
 
+# Page rank analysis
+
+Entirely taken from [https://blog.revolutionanalytics.com/2014/12/a-reproducible-r-example-finding-the-most-popular-packages-using-the-pagerank-algorithm.html](https://blog.revolutionanalytics.com/2014/12/a-reproducible-r-example-finding-the-most-popular-packages-using-the-pagerank-algorithm.html). 
+
+A version that worked over the dependencies in PyPi might be useful. 
+
+This takes a long time to run so no output shown.
+
+
+```{r eval=FALSE}
+
+library(miniCRAN)
+library(igraph)
+library(magrittr)
+
+# taken entirely from: https://blog.revolutionanalytics.com/2014/12/a-reproducible-r-example-finding-the-most-popular-packages-using-the-pagerank-algorithm.html
+
+#need to change date to yesterday
+MRAN <- "http://mran.revolutionanalytics.com/snapshot/2021-05-06/"
+
+pdb <- MRAN %>%
+  contrib.url(type = "source") %>%
+  available.packages(type="source", filters = NULL)
+
+g <- pdb[, "Package"] %>%
+  makeDepGraph(availPkgs = pdb, suggests=FALSE, enhances=FALSE, includeBasePkgs = FALSE)
+
+pr <- g %>%
+  page.rank(directed = FALSE) %>%
+  use_series("vector") %>%
+  sort(decreasing = TRUE) %>%
+  as.matrix %>%
+  set_colnames("page.rank")
+
+set.seed(42)
+pr %>%
+  head(100) %>%
+  rownames %>%
+  makeDepGraph(pdb) %>%
+  plot(main="Top packages by page rank", cex=0.5)
+
+print(sprintf("Rstan is %dth highest page rank score for R package dependencies out of %d packages", which(row.names(pr) == 'rstan'), nrow(pr)))
+```
