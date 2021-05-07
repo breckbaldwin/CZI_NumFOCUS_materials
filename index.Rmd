@@ -11,11 +11,11 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE
 
 # Point of all this
 
-I have spent a ton of time doing metrics for open source scientific software as part of my job at Columbia. Stan has been the focus since Columbia contributes to much of the ecosystem but it includes other software as a counter point for grant proposals and progress reports. I'd like to see these metrics used more broadly if it helps people write better proposals. I am currently working on the Chan Zuckerberg Initiative (CZI) [https://chanzuckerberg.com/wp-content/uploads/2021/03/EOSS-4-Combined-RFA-Packet.pdf](https://chanzuckerberg.com/wp-content/uploads/2021/03/EOSS-4-Combined-RFA-Packet.pdf) on behalf of the Stan organization and it looks like many other NumFOCUS projects are applying as well. This document is for them. 
+I have spent a ton of time doing metrics for open source scientific software as part of my job at Columbia. Stan has been the focus since Columbia contributes to much of the ecosystem but it includes tracking other software as a counter point for grant proposals and progress reports. I'd like to see these metrics used more broadly if it helps people write better proposals. I am currently working on the Chan Zuckerberg Initiative (CZI) [https://chanzuckerberg.com/wp-content/uploads/2021/03/EOSS-4-Combined-RFA-Packet.pdf](https://chanzuckerberg.com/wp-content/uploads/2021/03/EOSS-4-Combined-RFA-Packet.pdf) on behalf of the Stan organization and it looks like many other NumFOCUS projects are applying as well. This document is for them. 
 
-In January of 2021 NASA had an open source infrastructure call for proposals and the Stan org joined up with PyMC and ArviZ since we all play in the Bayesian space so why not do it together? I didn't want to get the funds at the expense of PyMC and ArviZ since we are all on the same team. Towards the end of the NASA effort it became clear that around 10 proposals were coming out of NumFOCUS--isn't AstroPy also on the same team? It made me uncomfortable.
+In January of 2021 NASA had an open source infrastructure call for proposals and the Stan org joined up with PyMC and ArviZ since we all play in the Bayesian space. So why not do it together? I didn't want to get the funds at the expense of PyMC and ArviZ since we are all on the same team. Towards the end of the NASA effort it became clear that around 10 proposals were coming out of NumFOCUS--isn't AstroPy also on my team too? It made me uncomfortable.
 
-The NASA proposal was a solid month's work and I had the privilege of being able to hit it pretty much full time due to my boss's generosity (Andrew Gelman) since I was using Columbia resources to support the Stan org at NumFOCUS. I had a think about our competitive advantage just because I had the cycles to focus exclusively on getting a good pitch and then I had a thunk: resources beget more resources to the expense of those without resources and here I am competing with organizations that I have no interest in 'defeating' in the funding game. 
+The NASA proposal was a solid month's work and I had the privilege of being able to hit it pretty much full time due to my boss's generosity (Andrew Gelman). I was using Columbia resources to support the Stan org at NumFOCUS and Columbia only indirectly benefits from Stan org funding. I had a think about our competitive advantage due to my having the cycles to focus exclusively on getting a good pitch and then I had a thunk: resources beget more resources to the expense of those without resources and here I am competing with organizations that I have no interest in 'defeating' in the funding game. 
 
 In response to my 'thunk' I decided to create this repo with my metrics to hopefully help other NumFOCUS projects for CZI. Sorry, they are in R but that is the language I am trying to learn but it is all pretty simple stuff, just a hassle to sort out queries, API access etc that take more time than I am willing to admit. It also represents what 'worked', many things were tried--looking at you Google scholar and your lack of an API and way to retrieve results without getting locked out. 
 
@@ -27,7 +27,7 @@ This file is `index.Rmd` at [https://github.com/breckbaldwin/CZI_NumFOCUS_materi
 
 I am trying the discussion feature that Github has at [https://github.com/breckbaldwin/CZI_NumFOCUS_materials/discussions](https://github.com/breckbaldwin/CZI_NumFOCUS_materials/discussions) so that is the place for questions/comments I assume. 
 
-For now I can be reached at fbb2116@columbia.edu or on NumFOCUS slack, @breckbaldwin. 
+For now I can be reached at fbb2116@columbia.edu or on NumFOCUS slack, @breck. 
 
 # The scripts
 
@@ -41,9 +41,9 @@ Onto the scripts:
 
 ## Subject distribution for Scopus.com
 
-This requires a subscription to scopus.com which I got because of my Columbia University affiliation. I will be loosing these credentials soon but am happy to run queries for other projects for the remaining month. Email fbb2116@columbia.edu with likely search strings that might be mentioned in the citations of a research publication. Hopefully your project has a unique name that functions as a rigid designator, i.e., use of the name is unique to your project which 'Stan' entirely fails at--see [https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/](https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/). 
+This requires a subscription to scopus.com which I got because of my Columbia University affiliation. I will be losing these credentials soon but am happy to run queries for other projects for the remaining month. Email fbb2116@columbia.edu with likely search strings that might be mentioned in the citations of a research publication. Hopefully your project has a unique name that functions as a rigid designator, i.e., use of the name is unique to your project which 'Stan' entirely fails at--see [https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/](https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/). 
 
-The subject categories are filtered to be biomedicine relevant. 
+The subject categories are filtered to be biomedicine relevant. The complete list is at [https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/](https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/). 
 
 ```{r} 
 library(tidyr)
