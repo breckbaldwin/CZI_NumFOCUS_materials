@@ -1,5 +1,5 @@
 ---
-title: "Resources for CZI Proposals from NumFOCUS"
+title: "Resources for CZI Proposals for NumFOCUS projects"
 author: "Breck Baldwin"
 date: "5/6/2021"
 output: html_document
@@ -333,5 +333,99 @@ for (i in 1:length(packages)) {
                                      is.na(packageDataDf$closed),]$created)))
 }
 
+```
+
+
+
+```{r}
+library(cranlogs)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(httr)
+library(jsonlite)
+library(stringr)
+library(R.cache)
+library(ggrepel)
+
+#https://www.ubuntupit.com/best-r-machine-learning-packages/
+packages <- c('rstan','lme4','Rcpp','randomForest','coda','glmnet','caret','mlr3','e1071','Rpart','KernLab','mlr','arules','mboost')
+packages <- c('ggplot2','lme4','rstan','rstanarm','brms')
+
+dls <- cran_downloads(
+  packages = packages, 
+  from ="2016-01-01",
+  to = "2021-04-30"
+)
+
+# do baseline label on Rccp/ggplot2
+mls <- dls %>% mutate(month=floor_date(date,"monthly")) %>% 
+  group_by(month,package)  %>% #?? order matters for month/package??
+  summarize(monthly_downloads=sum(count))
+
+# mls data check
+ mls_val = (mls %>% filter(package=='rstan') %>%
+            filter(month=='2018-02-01'))$monthly_downloads 
+ 
+ dls_val = sum(cran_downloads(packages = c('rstan'), 
+               from ="2018-02-01", to = "2018-02-28")$count)
+ 
+ if (mls_val != dls_val) {
+   stop(sprintf(paste("Problems with data, expect computed monthly total",        
+                      "mls_val=%d and more simply computed monthly total dls_val=%d to be equal"),
+   mls_val, dls_val))
+ }
+ 
+
+label_month <- max(mls$month)
+mls_label <- mls %>% 
+  mutate(label=if_else(month == label_month, 
+                       str_replace(package,
+                                   'ggplot2',
+                                   'BASELINE ggplot2'),
+                       NA_character_))
+
+plot1 <- ggplot(data=mls_label,
+                aes(x=month, y=monthly_downloads, color=package,
+                    group=package)) +
+         geom_line()
+
+b_plot1 <- ggplot(data=mls_label,
+                aes(x=as.numeric(month), y=log(monthly_downloads), color=package,
+                    group=package)) +
+         geom_line()
+
+log_plot1 <- plot1 + scale_y_continuous(breaks=c(0,100,1000,10000,100000,1000000), 
+                     trans = scales::log_trans())
+
+log_plot1_display <- log_plot1 +
+  geom_smooth(method='lm',formula=y~x, fullrange=TRUE, se=FALSE) +
+  geom_label_repel(aes(label = label), na.rm = TRUE) +
+         scale_color_discrete(guide = FALSE)
+
+log_plot1_2024_scale <- log_plot1 +   
+            xlim(as.Date('2016-01-01'),as.Date('2024-06-30'))
+
+log_plot1_2024_slopes_display <- log_plot1_2024_scale +
+  geom_smooth(method='lm',formula=y~x, fullrange=TRUE, se=FALSE) +
+  geom_label_repel(aes(label = label), na.rm = TRUE) +
+         scale_color_discrete(guide = FALSE)
+
+for (package_name in unique(mls$package[1:7])) {
+  entry <- mls[mls$package==package_name,]
+#  print(package_name)
+#  print(lm(pmax(0,log(entry$monthly_downloads))~entry$month))
+  
+  
+}
+
+  
+
+
+
+```
+
+```{r include = TRUE}
+print(log_plot1_2024_slopes_display)
 ```
 
