@@ -1,0 +1,100 @@
+---
+title: "Resources for CZI Proposals from NumFOCUS"
+author: "Breck Baldwin"
+date: "5/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE)
+```
+
+
+# Pull request aging against github for repo. 
+
+If your repo has lots of PRs then you may need to setup OAUTH to avoid rate restrictions when querying the github API. 
+
+```{r eval = TRUE, echo = TRUE}
+library(httr) # web access
+library(jsonlite) #json processing
+library(stringr) #regex
+library(lubridate) #date
+library(redux) #for redis below
+
+#comment out if you don't want to cache results with reddis.
+redis <- redux::hiredis()
+
+# pulls 
+get_results <-function(url) {
+  cache <- redis$GET(url) # check redis first
+  if (!is.null(cache)) {
+    result = unserialize(cache)
+    if (result$status_code == 200) {
+     # cat(paste("\nhitting redis for",url))
+      return(result)
+    }
+  }
+  # cat(paste("\ncache miss, querying:",url,"\n"))
+  random_wait <- abs(rnorm(1,1,1))
+  # cat(paste("\nWaiting", random_wait, "seconds to be nice to webserver\n"))
+  Sys.sleep(random_wait)
+  result <- GET(url)
+  redis$SET(url,serialize(result,NULL)) # redis didn't have it above
+  return(result)
+}
+
+# package names below, look them up at github.com, e.g. https://github.com/stan-dev/stanc3
+ packages = c('stan-dev/stanc3', 'arviz-devs/arviz')
+
+#packages = c('stan-dev/stanc3', 'stan-dev/pystan', 'stan-dev/stan', 
+
+packageDataDf = data.frame()
+for (i in 1:length(packages)) {
+  page = 1L
+  while(TRUE) {
+    url = paste('https://api.github.com/repos/', packages[i], 
+              '/pulls?state=all&page=', as.character(page), sep='')
+    result <- get_results(url) #comment out to not cache
+    # result <- serialize(GET(url), NULL)) #uncomment to not cache
+        if (result$status_code == 200) {
+      jsonTxt = rawToChar(as.raw(strtoi(result$content, 16L)))
+      newDataDf = jsonlite::fromJSON(jsonTxt)
+      n = nrow(newDataDf)
+      newDataLongDf = data.frame(package = rep(packages[i],n), 
+                           created = as.Date(newDataDf$created_at), 
+                           closed = as.Date(newDataDf$closed_at))
+      packageDataDf = rbind(packageDataDf, newDataLongDf)
+      if (! str_detect(result$headers$link, 'next')) { #last page
+        break
+      }
+      page = page + 1
+      # print(sprintf("doing page %d", page))
+    }
+    else {
+      print(result$status_code)
+      break
+    }
+  }
+}
+
+packageDataDf$age = packageDataDf$closed - packageDataDf$created
+
+for (i in 1:length(packages)) {
+  print(sprintf("package %s has %d closed pull requests, mean age to closure of %.0f days",
+        packages[i],
+        nrow(packageDataDf[packageDataDf$package == packages[i] &
+                           !is.na(packageDataDf$closed),]),
+        mean(packageDataDf[packageDataDf$package == packages[i] &
+                             !is.na(packageDataDf$closed),]$age)))
+  
+  print(sprintf("package %s has %d open pull requests, mean age of %.0f days from May 6, 2021",
+                packages[i],
+                nrow(packageDataDf[packageDataDf$package == packages[i] &
+                                     is.na(packageDataDf$closed),]),
+                mean(today(tzone = "UTC") - 
+                       packageDataDf[packageDataDf$package == packages[i] &
+                                     is.na(packageDataDf$closed),]$created)))
+}
+
+```
+
