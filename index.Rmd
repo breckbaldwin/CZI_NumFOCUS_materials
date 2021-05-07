@@ -9,10 +9,247 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE)
 ```
 
+# Point of all this
 
-# Pull request aging against github for repo. 
+I have spent a ton of time doing metrics in support of open source scientific software, Stan in particular, and I'd like to see them used more broadly if it helps people write better proposals. The current proposal that lots of NumFOCUS projects are applying for is the Chan Zuckerberg Initiative (CZI) [https://chanzuckerberg.com/wp-content/uploads/2021/03/EOSS-4-Combined-RFA-Packet.pdf](https://chanzuckerberg.com/wp-content/uploads/2021/03/EOSS-4-Combined-RFA-Packet.pdf).
 
-If your repo has lots of PRs then you may need to setup OAUTH to avoid rate restrictions when querying the github API. 
+The NumFOCUS community recently submitted a bunch of proposal to NASA's open source infrastructure call for proposals and Stan joined up with PyMC and ArviZ since we all play in the Bayesian space. I also didn't want to get the funds at the expense of PyMC and ArviZ since we are all on the same team. Towards the end of the NASA effort it was clear that 10 or so proposals were coming out of NumFOCUS--isn't AstroPy also on the same team? 
+
+The NASA proposal was a solid month's work and I had the privilege of being able to hit it pretty much full time due to my boss's generosity (Andrew Gelman). I had a think about our competitive advantage just becuase I had the cycles to focus exclusively on getting a good pitch and then I had a thunk: resources beget more resources and here I am competing with organizations that I have no interest in 'defeating' in the funding game. 
+
+In response to my 'thunk' I decided to create this repo with my metrics to hopefully help other NumFOCUS project for CZI. Sorry, they are in R but that is the language I am trying to learn but it is all pretty simple stuff, just a hassle to sort out queries, API access etc that take more time than I am willing to admit. 
+
+I'm not accepting the zero-sum quality of scientific funding and I don't want to compete with my NumFOCUS neighbors. Maybe CZI allocates more funds because of all the compelling proposals and excellent metrics justifying the projects. 
+
+## Navigation and communication
+
+This file is `index.Rmd` at [https://github.com/breckbaldwin/CZI_NumFOCUS_materials](https://github.com/breckbaldwin/CZI_NumFOCUS_materials) and is rendered as `index.html` with the github pages address being [https://breckbaldwin.github.io/CZI_NumFOCUS_materials/](https://breckbaldwin.github.io/CZI_NumFOCUS_materials/). 
+
+I am trying the discussion feature that Github has at [https://github.com/breckbaldwin/CZI_NumFOCUS_materials/discussions](https://github.com/breckbaldwin/CZI_NumFOCUS_materials/discussions) so that is the place for questions/comments I assume. 
+
+For now I can be reached at fbb2116@columbia.edu or on NumFOCUS slack, @breckbaldwin. 
+
+# Planned scripts
+
+All the below scripts exist, I just need to clean them up a bit. Hopefully in by May 8, 2021 so people can work use them over the weekend. NumFOCUS wants solid drafts May 10.
+
++ CRAN downloads over time. 
+
+# Complete scripts
+
+## Subject distribution for Scopus.com
+
+This requires a subscription to scopus.com which I got because of my Columbia University affiliation. I will be loosing these credentials soon but am happy to run queries for other projects for the remaining month. Email fbb2116@columbia.edu with likely search strings that might be mentioned in the citations of a research publication. Hopefully your project has a unique name that functions as a regid designator, i.e., use of the name is unique to your project which 'Stan' entirely fails at--see [https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/](https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/). 
+
+```{r} 
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(httr)
+library(jsonlite)
+library(stringr)
+library(ggrepel)
+library(redux)
+library(wkb)
+
+redis <- redux::hiredis()
+
+get_results <-function(url) {
+  result <- redis$GET(url) # check redis first
+  if (!is.null(result)) {
+    #cat(paste("\nhitting redis for",url))
+    return(unserialize(result))
+  }
+  #cat(paste("\ncache miss, querying:",url,"\n"))
+  random_wait <- abs(rnorm(1,1,1))
+  cat(paste("\nWaiting",random_wait,"seconds to be nice to webserver\n"))
+  Sys.sleep(random_wait)
+  result <- GET(url,
+      add_headers('X-ELS-APIKey'=API_KEY, 'X-ELS-Insttoken'=INSTITUTION_TOKEN))
+  redis$SET(url,serialize(result,NULL)) # redis didn't have it above
+  return(result)
+}
+
+year_start <- 2012
+year_end <- 2020
+years <- year_start:year_end
+df <- data.frame(years)
+
+stan_eco_q <- '(brms+AND+burkner)+OR+(gelman+AND+hoffman+AND+stan)+OR+mc-stan.org+OR+rstanarm+OR+pystan+OR+(rstan+AND+NOT+mit)'
+
+pymc_arviz_stan_eco_q <- paste('pymc*','arviz',stan_eco_q,sep='+OR+')
+
+pkg_query <- c(pymc_arviz_stan_eco_q,
+               '',
+               '')
+
+pkg_query_m <- matrix(pkg_query,ncol=3)
+
+credentials <- read_json('Scopus_credentials.json')
+API_KEY <- credentials$API_KEY
+INSTITUTION_TOKEN <- credentials$INSTITUTION_TOKEN
+# Format of Scopus_credentials.json
+# {
+# "API_KEY":"XXXXXXXXXXXXXXXXXXXXXXXXXxx",
+# "INSTITUTION_TOKEN":"XXXXXXXXXXXXXXXXXXXXXXXX"
+# }
+
+BASE_URL = 'https://api.elsevier.com/content/search/scopus'
+
+years <- year_start:year_end
+scopus.df <- data.frame(years)
+for (i in 1:nrow(pkg_query_m) ) {
+  package = pkg_query_m[i,1]
+  and_query = pkg_query_m[i,2]
+  or_query = pkg_query_m[i,3]
+  total_count <- 0
+  for (year in year_start:year_end) {
+    year_span <- paste(year-1,"-",year,sep='')
+    url <- paste(BASE_URL,'?query=', package, "+AND+PUBYEAR+=+",year,
+                 '&facets=subjarea(count=101)',
+                 sep='')
+    result <- get_results(url)
+    json_txt <-rawToChar(as.raw(strtoi(result$content, 16L)))
+    data <- jsonlite::fromJSON(json_txt)
+    total_count <- as.numeric(data$`search-results`$`opensearch:totalResults`)+ total_count
+    facet_count <- length(data$`search-results`$facet$category$name)
+    j <- 1
+    while (j < facet_count) {
+      name <- data$`search-results`$facet$category$name[j]
+      name <- data$`search-results`$facet$category$label[j]
+      name <- str_replace(name, " \\(all\\)", "")
+      hitCount <- as.numeric(data$`search-results`$facet$category$hitCount[j])
+      if (!name %in% colnames(scopus.df)) {
+        scopus.df[name] <- rep(0,year_end - year_start + 1)
+#        print(paste("name=",name,", count=",hitCount))
+      }
+      scopus.df[name][scopus.df$years==year,] <- hitCount
+      j <- j+ 1
+    }
+  }
+}
+column_names <- colnames(scopus.df)
+column_sums <- colSums(scopus.df)
+
+df_long <- gather(scopus.df,topic,yr_count,
+                  column_names[2]:column_names[length(column_names)])
+
+df_long$total <- rep(0,nrow(df_long))
+for (t in column_names[2:length(column_names)]) {
+  df_long[df_long$topic==t,]$total <- column_sums[[t]]
+}
+
+df_long_label <- df_long %>% 
+  mutate(label=if_else(years == max(years), 
+                       paste(as.character(topic),total),NA_character_))
+
+medicine_categories = paste("Health Professions",
+                        "Pharmacology, Toxicology and Pharmaceutics",
+                        "Psychology", 
+                        "Biochemistry, Genetics and Molecular Biology",
+                        "Immunology and Microbiology",
+                        "Nursing",
+                        sep="|")
+                      
+df_long_label2 <- df_long_label[str_detect(df_long_label$topic,medicine_categories),]
+
+plot2 <- ggplot(data=df_long_label2,aes(x=years,y=yr_count,group=topic, color=topic)) + 
+  geom_line() +
+  geom_point() +
+  geom_label_repel(aes(label = label),
+                   na.rm = TRUE) +
+  scale_color_discrete(guide = FALSE)
+
+plot2
+```
+  
+## PyPi downloads
+  
+  From Google's Big Query public data set [indigo-epigram-312023](https://console.cloud.google.com/bigquery?project=indigo-epigram-312023) the download data is stored for [PyPi](https://pypi.org/). The query for 'Keras' is below:
+
+`
+#standardSQL
+SELECT
+  COUNT(*) AS num_downloads,
+  DATE_TRUNC(DATE(timestamp), MONTH) AS `month`
+FROM `bigquery-public-data.pypi.file_downloads`
+WHERE
+  file.project = 'keras'
+  -- Only query the last x months of history
+  AND DATE(timestamp)
+    BETWEEN DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 120 MONTH), MONTH)
+    AND CURRENT_DATE()
+GROUP BY `month`
+ORDER BY `month` DESC
+`
+
+
+  
+```{r}
+library(ggplot2)
+library(ggrepel)
+library(tidyverse)
+
+packagesPyPi = c('Arviz', 'Keras', 'PyMC3', 'PyStan', 'PyTorch', 'TensorFlow', 'NumPy',
+                 'ggplot')
+              
+packagePyPiData = c('data/PyPi/ArviZ-results-20210502-112557.csv', 
+                'data/PyPi/Keras-results-20210502-132857.csv',
+                'data/PyPi/PyMC3-results-20210502-112819.csv',
+                'data/PyPi/PyStan-results-20210502-132744.csv',
+                'data/PyPi/PyTorch-results-20210502-130326.csv',
+                'data/PyPi/TensorFlow-results-20210502-131806.csv',
+                'data/PyPi/NumPy-results-20210503-200308.csv',
+                'data/PyPi/ggplot-results-20210503-201446.csv')
+pkgPyPiDf = data.frame()
+longest = 0
+for ( i in 1:length(packagePyPiData)) { # iterate from one list
+  df = read.csv(packagePyPiData[i])
+     if (longest < nrow(df)) {
+       longest = nrow(df)
+       pkgPyPiDf = data.frame(month = as.Date(df$month))          
+     }
+}
+rm(df, i)
+
+for (i in 1:length(packagesPyPi)) { # iterate from co-indexed list
+  df = read.csv(packagePyPiData[i])
+  pkgPyPiDf[[packagesPyPi[i]]] = c(df$num_downloads, rep(NA, longest - nrow(df)))
+}
+rm(df, i)
+
+
+pkgLongDf = gather(pkgPyPiDf, key = "package", value = "downloads", packagesPyPi)
+label_month = as.Date("2018-08-01")
+pkgLongDf = pkgLongDf %>% mutate(label = if_else(month == label_month, 
+                                                  package, 
+                                                  NA_character_)) 
+
+pyPiPlot = ggplot(data = pkgLongDf, aes(x = month, y = downloads, 
+                                        color = package, group = package)) +
+  geom_line(na.rm = TRUE) +
+  scale_x_date(limits = as.Date(c(min(pkgLongDf$month), "2021-04-01")),
+               breaks =  seq.Date(from = as.Date("2016-01-01"), 
+                                  to = as.Date("2021-01-01"), 
+                                  by = "1 year")) +
+  scale_color_discrete(guide = FALSE) +
+  scale_y_continuous(breaks=c(0, 100, 1000, 10000, 100000, 1e+06, 1e+07, 1e+08), 
+                     trans = scales::log_trans()) +
+  geom_label_repel(label = pkgLongDf$label, na.rm = TRUE)
+
+
+```
+
+```{r include = TRUE}
+print(pyPiPlot)
+rm(list=ls()) 
+```
+
+
+## Pull request aging against github for repo. 
+
+CZI asks for PR aging information. The below hits the github API and does some counting if you provide the public repo path. If your repo has lots of PRs then you may need to setup OAUTH to avoid rate restrictions when querying the github API. Ugly but works.
 
 ```{r eval = TRUE, echo = TRUE}
 library(httr) # web access
@@ -28,18 +265,18 @@ redis <- redux::hiredis()
 get_results <-function(url) {
   cache <- redis$GET(url) # check redis first
   if (!is.null(cache)) {
-    result = unserialize(cache)
+    result <- unserialize(cache)
     if (result$status_code == 200) {
      # cat(paste("\nhitting redis for",url))
       return(result)
     }
   }
   # cat(paste("\ncache miss, querying:",url,"\n"))
-  random_wait <- abs(rnorm(1,1,1))
+  random_wait <- abs(rnorm(1, 1, 1))
   # cat(paste("\nWaiting", random_wait, "seconds to be nice to webserver\n"))
   Sys.sleep(random_wait)
   result <- GET(url)
-  redis$SET(url,serialize(result,NULL)) # redis didn't have it above
+  redis$SET(url,serialize(result, NULL)) # redis didn't have it above
   return(result)
 }
 
@@ -52,22 +289,22 @@ packageDataDf = data.frame()
 for (i in 1:length(packages)) {
   page = 1L
   while(TRUE) {
-    url = paste('https://api.github.com/repos/', packages[i], 
+    url <- paste('https://api.github.com/repos/', packages[i], 
               '/pulls?state=all&page=', as.character(page), sep='')
     result <- get_results(url) #comment out to not cache
     # result <- serialize(GET(url), NULL)) #uncomment to not cache
         if (result$status_code == 200) {
-      jsonTxt = rawToChar(as.raw(strtoi(result$content, 16L)))
-      newDataDf = jsonlite::fromJSON(jsonTxt)
-      n = nrow(newDataDf)
-      newDataLongDf = data.frame(package = rep(packages[i],n), 
+      jsonTxt <- rawToChar(as.raw(strtoi(result$content, 16L)))
+      newDataDf <- jsonlite::fromJSON(jsonTxt)
+      n <- nrow(newDataDf)
+      newDataLongDf <- data.frame(package = rep(packages[i], n), 
                            created = as.Date(newDataDf$created_at), 
                            closed = as.Date(newDataDf$closed_at))
-      packageDataDf = rbind(packageDataDf, newDataLongDf)
+      packageDataDf <- rbind(packageDataDf, newDataLongDf)
       if (! str_detect(result$headers$link, 'next')) { #last page
         break
       }
-      page = page + 1
+      page <- page + 1
       # print(sprintf("doing page %d", page))
     }
     else {
@@ -77,7 +314,7 @@ for (i in 1:length(packages)) {
   }
 }
 
-packageDataDf$age = packageDataDf$closed - packageDataDf$created
+packageDataDf$age <- packageDataDf$closed - packageDataDf$created
 
 for (i in 1:length(packages)) {
   print(sprintf("package %s has %d closed pull requests, mean age to closure of %.0f days",
