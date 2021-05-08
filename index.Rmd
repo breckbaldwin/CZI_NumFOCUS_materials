@@ -49,6 +49,8 @@ A good rigid designator is 'matplotlib' because it is not likely to refer someth
 
 The subject categories are filtered to be biomedicine relevant which is CZI specific. The complete list is at [https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/](https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/), see `categories()` function for possible values. 
 
+The query being run below is 'jupyter'
+
 ```{r} 
 library(tidyr)
 library(ggplot2)
@@ -119,7 +121,7 @@ matplotlib_q <- 'matplotlib'
 
 jupyter_q <- 'jupyter'
 
-pkg_query <- c(jupyter_q,
+pkg_query <- c(jupyter_q,  # sets the query
                '',
                '')
 
@@ -220,7 +222,7 @@ plot2
 
 ```
 
-Scopus subject categories for the query `"pymc*+OR+arviz+OR+(brms+AND+burkner)+OR+(gelman+AND+hoffman+AND+stan)+OR+mc-stan.org+OR+rstanarm+OR+pystan+OR+(rstan+AND+NOT+mit)"` with total counts across biomedicine subject categories.   
+Annual count of Scopus subject categories for the query `jupyter` with total counts across biomedicine subject categories.   
   
   
 ## PyPi downloads
