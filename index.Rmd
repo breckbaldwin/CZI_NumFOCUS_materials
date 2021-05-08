@@ -41,9 +41,13 @@ Onto the scripts:
 
 ## Subject distribution for Scopus.com
 
-This requires a subscription to scopus.com which I got because of my Columbia University affiliation. I will be losing these credentials soon but am happy to run queries for other projects for the remaining month. Email fbb2116@columbia.edu with likely search strings that might be mentioned in the citations of a research publication. Hopefully your project has a unique name that functions as a rigid designator, i.e., use of the name is unique to your project which 'Stan' entirely fails at--see [https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/](https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/). 
+Scopus.com is Elsevier's academic search engine over the research literature, both what they publish and other sources. They offer a decent API for searching and subject classification by category. 
 
-The subject categories are filtered to be biomedicine relevant. The complete list is at [https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/](https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/), see `categories()` function for possible values. 
+This code requires a subscription to scopus.com which I got because of my Columbia University affiliation. I will be losing these credentials soon but am happy to run queries for other projects for the remaining month. Email fbb2116@columbia.edu with likely search strings that might be mentioned in the citations of a research publication. Hopefully your project has a unique name that functions as a rigid designator, i.e., use of the name is unique to your project which 'Stan' entirely fails at--see [https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/](https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/). 
+
+A good rigid designator is 'matplotlib' because it is not likely to refer something else. Articles that mention 'mathplotlib' in passing are counted as much as those that are all about the library. No distinction between the body and references section is made. 
+
+The subject categories are filtered to be biomedicine relevant which is CZI specific. The complete list is at [https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/](https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/), see `categories()` function for possible values. 
 
 ```{r} 
 library(tidyr)
@@ -113,7 +117,9 @@ pymc_arviz_stan_eco_q <- paste('pymc*','arviz',stan_eco_q,sep='+OR+')
 
 matplotlib_q <- 'matplotlib'
 
-pkg_query <- c(pymc_arviz_stan_eco_q,
+jupyter_q <- 'jupyter'
+
+pkg_query <- c(jupyter_q,
                '',
                '')
 
@@ -214,7 +220,7 @@ plot2
 
 ```
 
-Scopus subject categories with total counts.   
+Scopus subject categories for the query `"pymc*+OR+arviz+OR+(brms+AND+burkner)+OR+(gelman+AND+hoffman+AND+stan)+OR+mc-stan.org+OR+rstanarm+OR+pystan+OR+(rstan+AND+NOT+mit)"` with total counts across biomedicine subject categories.   
   
   
 ## PyPi downloads
