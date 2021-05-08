@@ -31,11 +31,11 @@ For now I can be reached at fbb2116@columbia.edu or on NumFOCUS slack, @breck.
 
 # The scripts
 
-Stan and Bayesian software as a whole is growing rapidly so most of the scripts focus on growth over time as a proxy for relevance to science. Your package may have different growth. There are probably inertial effects at play that bake in growth because software is getting downloaded more and automated systems like continuous integration systems are growing in popularity which apparently can drive downloads. For CRAN downloads I do add regression lines to show relative growth to baseline packages like ggplot2 to account for this. 
+Stan and Bayesian software as a whole is growing rapidly so most of the scripts focus on growth over time as a proxy for relevance to science. Your package may have different qualities. There are probably inertial effects at play that bake in growth because software is getting downloaded more and automated systems like continuous integration systems are growing in popularity which apparently can drive downloads. For CRAN downloads I do add regression lines to show relative growth to baseline packages like ggplot2 to account for this. 
 
 Research citations have inertial effects too and scopus.com undercounts considerably what scholar.google.com reports. 
 
-Again this is a quick effort and not a well designed open source project. Documentation is minimal, mistakes have probably been made but I have tried to keep variables understandable and comments helpful. I welcome bug fixes and/or extensions and I hope it helps your proposal. 
+**WARNING** This is a quick effort and not a well designed open source project. Documentation is minimal, mistakes have probably been made but I have tried to keep variables understandable and comments helpful. I welcome bug fixes and/or extensions and I hope it helps your proposal. 
 
 Onto the scripts:
 
@@ -82,7 +82,7 @@ get_results <-function(url) {
   if (!is.null(cache)) {
     result <- unserialize(cache)
     if (result$status_code == 200) {
-     # cat(paste("\nhitting redis for",url))
+      # cat(paste("\nhitting redis for",url))
       return(result)
     }
   }
@@ -121,7 +121,9 @@ matplotlib_q <- 'matplotlib'
 
 jupyter_q <- 'jupyter'
 
-pkg_query <- c(jupyter_q,  # sets the query
+query = jupyter_q
+
+pkg_query <- c(query,  # sets the query
                '',
                '')
 
@@ -168,6 +170,20 @@ column_sums <- colSums(scopus.df)
 
 df_long <- gather(scopus.df, key = 'topic', value = 'yr_count',
                   column_names[2]:column_names[length(column_names)])
+
+write.csv(scopus.df, file=paste("scopus_data/", query, ".csv", sep = ""), row.names = FALSE) 
+write.csv(df_long, file=paste("scopus_data/", query, "_long.csv", sep = ""), row.names = FALSE) 
+
+```
+
+Two files are created named after the query,  `scopus_data/jupyter.csv` and `scopus_data/jupyter_long.csv` with results. Not clear what happens with complex queries regarding the file system. 
+
+Summing over the categories yields the total counts per year, summing over years yeilds total counts overall. 
+
+Processing continues below where I filter for biomedicine categories:
+
+```{r}
+# continues with values from previous chunk
 
 df_long$total <- rep(0,nrow(df_long))
 for (t in column_names[2:length(column_names)]) {
@@ -220,9 +236,10 @@ plot2 <- ggplot(data=df_long_label2,aes(x = years, y = yr_count, group = topic, 
 
 plot2
 
+
 ```
 
-Annual count of Scopus subject categories for the query `jupyter` with total counts across biomedicine subject categories.   
+Annual count of Scopus subject categories for the query "jupyter" with total counts across biomedicine subject categories. 
   
   
 ## PyPi downloads
