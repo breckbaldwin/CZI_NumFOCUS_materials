@@ -17,9 +17,9 @@ In January of 2021 NASA had an open source infrastructure call for proposals and
 
 The NASA proposal was a solid month's work and I had the privilege of being able to hit it pretty much full time due to my boss's generosity (Andrew Gelman). I was using Columbia resources to support the Stan org at NumFOCUS and Columbia only indirectly benefits from Stan org funding. I had a think about our competitive advantage due to my having the cycles to focus exclusively on getting a good pitch and then I had a thunk: resources beget more resources to the expense of those without resources and here I am competing with organizations that I have no interest in 'defeating' in the funding game. 
 
-In response to my 'thunk' I decided to create this repo with my metrics to hopefully help other NumFOCUS projects for CZI. Sorry, they are in R but that is the language I am trying to learn but it is all pretty simple stuff, just a hassle to sort out queries, API access etc that take more time than I am willing to admit. It also represents what 'worked', many things were tried--looking at you Google scholar and your lack of an API and way to retrieve results without getting locked out. 
+In response to my 'thunk' I decided to create this repo with my metrics to hopefully help other NumFOCUS projects for CZI. Sorry, they are in R but that is the language I am trying to learn but it is all pretty simple stuff, just a hassle to sort out queries, API access etc that take more time than I am willing to admit. It also represents what 'worked', many things were tried--looking at you Google scholar and your lack of an API and way to retrieve results without getting locked out. I also tried many high level access packages that inevitably lacked some feature or information I wanted so all the code is pretty low level `GET` interactions but that level of control is worth it and has become my starting place. 
 
-So in short I am not accepting the zero-sum quality of scientific funding and I don't want to compete with my NumFOCUS neighbors. Maybe CZI allocates more funds because of all of the compelling proposals and excellent metrics justifying the projects. Also I'd like the scientists to keep sciencing, not scraping the web for impact data to support their work. 
+So in short I am not accepting the zero-sum basis of scientific funding and I don't want to compete with my NumFOCUS neighbors. Maybe CZI allocates more funds because of all of the compelling proposals and excellent metrics justifying the projects. Also I'd like the scientists to keep sciencing, not scraping the web for impact data to support their work. 
 
 ## Navigation and communication
 
@@ -43,13 +43,19 @@ Onto the scripts:
 
 Scopus.com is Elsevier's academic search engine over the research literature, both what they publish and other sources. They offer a decent API for searching and subject classification by category. 
 
-This code requires a subscription to scopus.com which I got because of my Columbia University affiliation. I will be losing these credentials soon but am happy to run queries for other projects for the remaining month. Email fbb2116@columbia.edu with likely search strings that might be mentioned in the citations of a research publication. Hopefully your project has a unique name that functions as a rigid designator, i.e., use of the name is unique to your project which 'Stan' entirely fails at--see [https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/](https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/). 
+This code uses a subscription to scopus.com which I got because of my Columbia University affiliation. Information about getting credentials is at [https://dev.elsevier.com/sc_apis.html](https://dev.elsevier.com/sc_apis.html), there appears to be free access available but I don't know if the free layer gives you all the features I am using below. It does require an interaction with a human I believe--just submit a request and you get it back in a day I recall.
+
+I will be losing these credentials soon but am happy to run queries for other projects for the remaining month. I have been giving projecs a wide and long version of all the data broken down by Scopus category--look at the `write.csv` calls below.
+
+Email fbb2116@columbia.edu with likely search strings that might be mentioned in the citations of a research publication. Hopefully your project has a unique name that functions as a rigid designator, i.e., use of the name is unique to your project which 'Stan' entirely fails at--see [https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/](https://statmodeling.stat.columbia.edu/2019/04/29/we-shouldntve-called-it-stan-i-shouldve-listened-to-bob-and-hadley/). 
 
 A good rigid designator is 'matplotlib' because it is not likely to refer something else. Articles that mention 'mathplotlib' in passing are counted as much as those that are all about the library. No distinction between the body and references section is made. 
 
-The subject categories are filtered to be biomedicine relevant which is CZI specific. The complete list is at [https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/](https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/), see `categories()` function for possible values. 
+After having done a few of these for others I find that the inclusion of 'py' someplace in the package name is really helping with search because it makes it unique. 
 
-The query being run below is 'jupyter'
+The subject categories are filtered to be biomedicine relevant which is CZI specific. The complete list is at [https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/](https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/), see `categories()` function below for possible values. 
+
+The query being run below is 'jupyter', see how that nice 'py' in the middle makes for a nice rigid designator.
 
 ```{r} 
 library(tidyr)
@@ -60,11 +66,8 @@ library(httr)
 library(jsonlite)
 library(stringr)
 library(ggrepel)
-library(redux)
 library(wkb)
 
-report <- FALSE #controlsprint statements. 
-redis <- redux::hiredis()
 credentials <- read_json('Scopus_credentials.json')
 API_KEY <- credentials$API_KEY
 INSTITUTION_TOKEN <- credentials$INSTITUTION_TOKEN
@@ -76,36 +79,41 @@ INSTITUTION_TOKEN <- credentials$INSTITUTION_TOKEN
 
 BASE_URL = 'https://api.elsevier.com/content/search/scopus'
 
+USE_CACHE = TRUE #will have to setup a redis server
+REPORT_PROGRESS = FALSE
 
-get_results <-function(url) {
-  cache <- redis$GET(url) # check redis first
-  if (!is.null(cache)) {
-    result <- unserialize(cache)
-    if (result$status_code == 200) {
-      # cat(paste("\nhitting redis for",url))
-      return(result)
+if (USE_CACHE) {
+  library(redux)
+  redis <- redux::hiredis()
+  get_results <- function(url) {
+    cache <- redis$GET(url) # check redis first
+    if (!is.null(cache)) {
+      result <- unserialize(cache)
+      if (result$status_code == 200) {
+        if (REPORT_PROGRESS) {
+          cat(paste("\nhitting redis for", url))
+        }
+        return(result)
+      }
     }
+    random_wait <- abs(rnorm(1, 1, 1))
+    if (REPORT_PROGRESS) {
+      cat(paste("\ncache miss, querying:", url, "\n"))
+      cat(paste(
+        "\nWaiting",
+        random_wait,
+        "seconds to be nice to webserver\n"
+      ))
+    }
+    Sys.sleep(random_wait)
+    result <- GET(
+      url,
+      add_headers('X-ELS-APIKey' = API_KEY,
+                  'X-ELS-Insttoken' = INSTITUTION_TOKEN)
+    )
+    redis$SET(url, serialize(result, NULL))
+    return(result)
   }
-  # cat(paste("\ncache miss, querying:",url,"\n"))
-  random_wait <- abs(rnorm(1, 1, 1))
-  # cat(paste("\nWaiting", random_wait, "seconds to be nice to webserver\n"))
-  Sys.sleep(random_wait)
-  result <- GET(url,
-                add_headers('X-ELS-APIKey'=API_KEY,
-                            'X-ELS-Insttoken'=INSTITUTION_TOKEN))
-  redis$SET(url,serialize(result,NULL)) # redis didn't have it above
-  return(result)
-}
-
-# category mapping to description at 
-# https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/
-categories <- function() {
-  url <- 'https://api.elsevier.com/content/subject/scopus'
-  result <- get_results(url)
-  json_txt <-rawToChar(as.raw(strtoi(result$content, 16L)))
-  data <- jsonlite::fromJSON(json_txt)
-  catsDf = data$`subject-classifications`$`subject-classification`
-  return(catsDf)
 }
 
 year_start <- 2012
@@ -113,9 +121,11 @@ year_end <- 2020 # want complete years or graph looks odd
 years <- year_start:year_end
 df <- data.frame(years)
 
-stan_eco_q <- '(brms+AND+burkner)+OR+(gelman+AND+hoffman+AND+stan)+OR+mc-stan.org+OR+rstanarm+OR+pystan+OR+(rstan+AND+NOT+mit)'
+stan_eco_q <-
+  '(brms+AND+burkner)+OR+(gelman+AND+hoffman+AND+stan)+OR+mc-stan.org+OR+rstanarm+OR+pystan+OR+(rstan+AND+NOT+mit)'
 
-pymc_arviz_stan_eco_q <- paste('pymc*','arviz',stan_eco_q,sep='+OR+')
+pymc_arviz_stan_eco_q <-
+  paste('pymc*', 'arviz', stan_eco_q, sep = '+OR+')
 
 matplotlib_q <- 'matplotlib'
 
@@ -123,56 +133,79 @@ jupyter_q <- 'jupyter'
 
 query = jupyter_q
 
-pkg_query <- c(query,  # sets the query
-               '',
-               '')
-
-pkg_query_m <- matrix(pkg_query,ncol=3)
-
 years <- year_start:year_end
 scopus.df <- data.frame(years)
-for (i in 1:nrow(pkg_query_m) ) {
-  package = pkg_query_m[i,1]
-  and_query = pkg_query_m[i,2]
-  or_query = pkg_query_m[i,3]
-  total_count <- 0
-  for (year in year_start:year_end) {
-    year_span <- paste(year-1,"-",year,sep='')
-    url <- paste(BASE_URL,'?query=', package, "+AND+PUBYEAR+=+",year,
-                 '&facets=subjarea(count=101)',
-                 sep='')
+package = query
+total_count <- 0
+for (year in year_start:year_end) {
+  year_span <- paste(year - 1, "-", year, sep = '')
+  url <-
+    paste(
+      BASE_URL,
+      '?query=',
+      package,
+      "+AND+PUBYEAR+=+",
+      year,
+      '&facets=subjarea(count=101)',
+      sep = ''
+    )
+  if (USE_CACHE) {
     result <- get_results(url)
-    if (result$status_code != 200) {
-      print(sprintf("got non 200 status from query: %d", result$status_code))
-      stop()
-    }
-    json_txt <-rawToChar(as.raw(strtoi(result$content, 16L)))
-    data <- jsonlite::fromJSON(json_txt)
-    total_count <- as.numeric(data$`search-results`$`opensearch:totalResults`)+ total_count
-    facet_count <- length(data$`search-results`$facet$category$name)
-    j <- 1
-    while (j < facet_count) {
-      name <- data$`search-results`$facet$category$name[j]
-      name <- data$`search-results`$facet$category$label[j]
-      name <- str_replace(name, " \\(all\\)", "")
-      hitCount <- as.numeric(data$`search-results`$facet$category$hitCount[j])
-      if (!name %in% colnames(scopus.df)) {
-        scopus.df[name] <- rep(0,year_end - year_start + 1)
-        #        print(paste("name=",name,", count=",hitCount))
-      }
-      scopus.df[name][scopus.df$years==year,] <- hitCount
-      j <- j+ 1
-    }
   }
+  else {
+    if (REPORT_PROGRESS) {
+      cat(print(paste("hitting scopus with:", url)))
+    }
+    result <- GET(
+    url,
+    add_headers('X-ELS-APIKey' = API_KEY,
+                'X-ELS-Insttoken' = INSTITUTION_TOKEN)
+    )
+  }
+  if (result$status_code != 200) {
+    print(sprintf("got non 200 status from query: %d", result$status_code))
+    stop()
+  }
+  json_txt <- rawToChar(as.raw(strtoi(result$content, 16L)))
+  data <- jsonlite::fromJSON(json_txt)
+  total_count <-
+    as.numeric(data$`search-results`$`opensearch:totalResults`) + total_count
+  facet_count <- length(data$`search-results`$facet$category$name)
+  j <- 1
+  while (j < facet_count) {
+    name <- data$`search-results`$facet$category$name[j]
+    name <- data$`search-results`$facet$category$label[j]
+    name <- str_replace(name, " \\(all\\)", "")
+    hitCount <-
+      as.numeric(data$`search-results`$facet$category$hitCount[j])
+    if (!name %in% colnames(scopus.df)) {
+      scopus.df[name] <- rep(0, year_end - year_start + 1)
+      #        print(paste("name=",name,", count=",hitCount))
+    }
+    scopus.df[name][scopus.df$years == year, ] <- hitCount
+    j <- j + 1
+  }
+  
 }
+
 column_names <- colnames(scopus.df)
 column_sums <- colSums(scopus.df)
 
-df_long <- gather(scopus.df, key = 'topic', value = 'yr_count',
+df_long <- gather(scopus.df,
+                  key = 'topic',
+                  value = 'yr_count',
                   column_names[2]:column_names[length(column_names)])
 
-write.csv(scopus.df, file=paste("scopus_data/", query, ".csv", sep = ""), row.names = FALSE) 
-write.csv(df_long, file=paste("scopus_data/", query, "_long.csv", sep = ""), row.names = FALSE) 
+write.csv(
+  scopus.df,
+  file = paste("scopus_data/", query, ".csv", sep = ""),
+  row.names = FALSE
+) #not going to work in general
+write.csv(
+  df_long,
+  file = paste("scopus_data/", query, "_long.csv", sep = ""),
+  row.names = FALSE
+) #not going to work in general
 
 ```
 
@@ -185,57 +218,85 @@ Processing continues below where I filter for biomedicine categories:
 ```{r}
 # continues with values from previous chunk
 
-df_long$total <- rep(0,nrow(df_long))
+#got the raw csv data, now lets graph it
+#add total count to data frame for each category
+df_long$total <- rep(0, nrow(df_long))
 for (t in column_names[2:length(column_names)]) {
-  df_long[df_long$topic==t,]$total <- column_sums[[t]]
+  df_long[df_long$topic == t, ]$total <- column_sums[[t]]
+}
+# assign label to last year for display '<topic> <total>'
+# can use to scatter the labels to points other than max(years)
+df_long_label <- df_long %>%
+  mutate(label = if_else(years == max(years),
+                         paste(as.character(topic), total), NA_character_))
+
+# category mapping to description at
+# https://service.elsevier.com/app/answers/detail/a_id/15181/supporthub/scopus/
+categories <- function() {
+  url <- 'https://api.elsevier.com/content/subject/scopus'
+  result <- GET(url,
+                add_headers('X-ELS-APIKey' = API_KEY,
+                            'X-ELS-Insttoken' = INSTITUTION_TOKEN))
+  json_txt <- rawToChar(as.raw(strtoi(result$content, 16L)))
+  data <- jsonlite::fromJSON(json_txt)
+  catsDf = data$`subject-classifications`$`subject-classification`
+  return(catsDf)
 }
 
-df_long_label <- df_long %>% 
-  mutate(label=if_else(years == max(years), 
-                       paste(as.character(topic),total),NA_character_))
-
-
-# pulled from categories returned by 
+# pulled from categories returned by below, uncomment to run
 # unique(categories()$description)
 
-# [1] "Multidisciplinary"                            "Agricultural and Biological Sciences"        
+# [1] "Multidisciplinary"                            "Agricultural and Biological Sciences"
 # [3] "Arts and Humanities"                          "Biochemistry, Genetics and Molecular Biology"
-# [5] "Business, Management and Accounting"          "Chemical Engineering"                        
-# [7] "Chemistry"                                    "Computer Science"                            
-# [9] "Decision Sciences"                            "Earth and Planetary Sciences"                
-# [11] "Economics, Econometrics and Finance"          "Energy"                                      
-# [13] "Engineering"                                  "Environmental Science"                       
-# [15] "Immunology and Microbiology"                  "Materials Science"                           
-# [17] "Mathematics"                                  "Medicine"                                    
-# [19] "Neuroscience"                                 "Nursing"                                     
-# [21] "Pharmacology, Toxicology and Pharmaceutics"   "Physics and Astronomy"                       
-# [23] "Psychology"                                   "Social Sciences"                             
-# [25] "Veterinary"                                   "Dentistry"                                   
-# [27] "Health Professions"                          
+# [5] "Business, Management and Accounting"          "Chemical Engineering"
+# [7] "Chemistry"                                    "Computer Science"
+# [9] "Decision Sciences"                            "Earth and Planetary Sciences"
+# [11] "Economics, Econometrics and Finance"          "Energy"
+# [13] "Engineering"                                  "Environmental Science"
+# [15] "Immunology and Microbiology"                  "Materials Science"
+# [17] "Mathematics"                                  "Medicine"
+# [19] "Neuroscience"                                 "Nursing"
+# [21] "Pharmacology, Toxicology and Pharmaceutics"   "Physics and Astronomy"
+# [23] "Psychology"                                   "Social Sciences"
+# [25] "Veterinary"                                   "Dentistry"
+# [27] "Health Professions"
 
-medicine_categories = paste("Health Professions",
-                            "Pharmacology, Toxicology and Pharmaceutics",
-                            "Psychology", 
-                            "Biochemistry, Genetics and Molecular Biology",
-                            "Immunology and Microbiology",
-                            "Nursing",
-                            "Medicine",
-                            "Neuroscience",
-                            "Veterinary",
-                            "Agricultural and Biological Sciences",
-                            sep="|")
+medicine_categories = paste(
+  "Health Professions",
+  "Pharmacology, Toxicology and Pharmaceutics",
+  "Psychology",
+  "Biochemistry, Genetics and Molecular Biology",
+  "Immunology and Microbiology",
+  "Nursing",
+  "Medicine",
+  "Neuroscience",
+  "Veterinary",
+  "Agricultural and Biological Sciences",
+  sep = "|"
+)
 
-df_long_label2 <- df_long_label[str_detect(df_long_label$topic,medicine_categories),]
+# filter for medicine categories
+df_long_label_filtered <-
+  df_long_label[str_detect(df_long_label$topic, medicine_categories), ]
 
-plot2 <- ggplot(data=df_long_label2,aes(x = years, y = yr_count, group = topic, color = topic)) + 
+#plot df_long_label to see all categories
+plot2 <-
+  ggplot(data = df_long_label_filtered, aes(
+    x = years,
+    y = yr_count,
+    group = topic,
+    color = topic
+  )) +
   geom_line() +
   geom_point() +
   geom_label_repel(aes(label = label),
+                   max.overlaps = 17, # adjust to allow for all labels
                    na.rm = TRUE) +
-  scale_color_discrete(guide = FALSE)
+  scale_color_discrete(guide = FALSE) #removes guide on right
 
-plot2
+print(plot2)
 
+rm(list = ls()) #clean up environment
 
 ```
 
@@ -262,47 +323,50 @@ GROUP BY `month`
 ORDER BY `month` DESC
 ```
 
+You will have to setup an account, you get $300 in credit as of now so this will be free but they want a credit card anyway. I can run queries for projects, takes 5 min. 
+
+Place resulting .csv file in appropriate folder, I have accumulated some current examples below and they are in the repo. Add yours with the package name following 'data/PyPi' and as a prefix before the first '-'. 
 
   
 ```{r}
 library(ggplot2)
 library(ggrepel)
 library(tidyverse)
+library(stringr)
 
-packagesPyPi = c('Arviz', 'Keras', 'PyMC3', 'PyStan', 'PyTorch', 'TensorFlow', 'NumPy',
-                 'ggplot')
-              
+# this list controls what is displayed
 packagePyPiData = c('data/PyPi/ArviZ-results-20210502-112557.csv', 
-                'data/PyPi/Keras-results-20210502-132857.csv',
-                'data/PyPi/PyMC3-results-20210502-112819.csv',
-                'data/PyPi/PyStan-results-20210502-132744.csv',
-                'data/PyPi/PyTorch-results-20210502-130326.csv',
-                'data/PyPi/TensorFlow-results-20210502-131806.csv',
-                'data/PyPi/NumPy-results-20210503-200308.csv',
-                'data/PyPi/ggplot-results-20210503-201446.csv')
+                    'data/PyPi/Keras-results-20210502-132857.csv',
+                    'data/PyPi/PyMC3-results-20210502-112819.csv',
+                    'data/PyPi/PyStan-results-20210502-132744.csv',
+                    'data/PyPi/PyTorch-results-20210502-130326.csv',
+                    'data/PyPi/TensorFlow-results-20210502-131806.csv',
+                    'data/PyPi/NumPy-results-20210503-200308.csv',
+                    'data/PyPi/ggplot-results-20210503-201446.csv')
+
+# note format for display name extraction: "data/PyPi<display name>-resul...csv"
+packagesPyPi = str_match(packagePyPiData, "data/PyPi/([^-]+)-results.*")[,2]
+
 pkgPyPiDf = data.frame()
 longest = 0
 for ( i in 1:length(packagePyPiData)) { # iterate from one list
   df = read.csv(packagePyPiData[i])
-     if (longest < nrow(df)) {
-       longest = nrow(df)
-       pkgPyPiDf = data.frame(month = as.Date(df$month))          
-     }
+  if (longest < nrow(df)) {
+    longest = nrow(df)
+    pkgPyPiDf = data.frame(month = as.Date(df$month))          
+  }
 }
-rm(df, i)
 
 for (i in 1:length(packagesPyPi)) { # iterate from co-indexed list
   df = read.csv(packagePyPiData[i])
   pkgPyPiDf[[packagesPyPi[i]]] = c(df$num_downloads, rep(NA, longest - nrow(df)))
 }
-rm(df, i)
-
 
 pkgLongDf = gather(pkgPyPiDf, key = "package", value = "downloads", packagesPyPi)
 label_month = as.Date("2018-08-01")
 pkgLongDf = pkgLongDf %>% mutate(label = if_else(month == label_month, 
-                                                  package, 
-                                                  NA_character_)) 
+                                                 package, 
+                                                 NA_character_)) 
 
 pyPiPlot = ggplot(data = pkgLongDf, aes(x = month, y = downloads, 
                                         color = package, group = package)) +
@@ -316,69 +380,105 @@ pyPiPlot = ggplot(data = pkgLongDf, aes(x = month, y = downloads,
                      trans = scales::log_trans()) +
   geom_label_repel(label = pkgLongDf$label, na.rm = TRUE)
 
-
-```
-
-```{r include = TRUE}
 print(pyPiPlot)
-rm(list=ls()) 
+rm(list = ls()) #cleanup
 ```
 
 Monthly counts of PyPi downloads. 
 
 ## Pull request aging against github for repo. 
 
-CZI asks for PR aging information. The below hits the github API and does some counting if you provide the public repo path. If your repo has lots of PRs then you may need to setup OAUTH to avoid rate restrictions when querying the github API. Ugly but works.
+CZI asks for PR aging information. The below hits the github API and does some counting if you provide the public repo path. It is very easy to get a personal access token, see [ https://github.com/settings/tokens]( https://github.com/settings/tokens) and without it the access will time out for more than just a few pages.
+Format of 'github_credentials.json'
+```
+{
+ "PERSONAL_TOKEN":"XXXXXXXXXXXXXXXXXXXXXXXXxx",
+ "USER":"XXXXXXXXXXXXXXXXXXXXXX"
+ }
+```
+Make that file a sibling of the Rscript or this page and you should be good. 
 
 ```{r eval = TRUE, echo = TRUE}
 library(httr) # web access
 library(jsonlite) #json processing
 library(stringr) #regex
 library(lubridate) #date
-library(redux) #for redis below
 
-#comment out if you don't want to cache results with reddis.
-redis <- redux::hiredis()
+USE_CACHE = TRUE #will have to setup a redis server
+REPORT_PROGRESS = FALSE
 
-# pulls 
-get_results <-function(url) {
-  cache <- redis$GET(url) # check redis first
-  if (!is.null(cache)) {
-    result <- unserialize(cache)
-    if (result$status_code == 200) {
-     # cat(paste("\nhitting redis for",url))
-      return(result)
+credentials <- read_json('github_credentials.json')
+PERSONAL_TOKEN <- credentials$PERSONAL_TOKEN
+USER <- credentials$USER
+# Format of github_credentials.json
+# {
+# "PERSONAL_TOKEN":"XXXXXXXXXXXXXXXXXXXXXXXXxx",
+# "USER":"XXXXXXXXXXXXXXXXXXXXXX"
+# }
+# get your token at:
+# https://github.com/settings/tokens
+# you want to check the 'public repo access' at least. 
+# }
+
+if (USE_CACHE) {
+  library(redux)
+  redis <- redux::hiredis()
+  get_results <- function(url) {
+    cache <- redis$GET(url) # check redis first
+    if (!is.null(cache)) {
+      result <- unserialize(cache)
+      if (result$status_code == 200) {
+        if (REPORT_PROGRESS) {
+          cat(paste("\nhitting redis for", url))
+        }
+        return(result)
+      }
     }
+    random_wait <- abs(rnorm(1, 1, 1))
+    if (REPORT_PROGRESS) {
+      cat(paste("\ncache miss, querying:", url, "\n"))
+      cat(paste(
+        "\nWaiting",
+        random_wait,
+        "seconds to be nice to webserver\n"
+      ))
+    }
+    Sys.sleep(random_wait)
+    result <- GET(url, config = authenticate(user = USER, 
+                                             password = PERSONAL_TOKEN))
+    redis$SET(url, serialize(result, NULL))
+    return(result)
   }
-  # cat(paste("\ncache miss, querying:",url,"\n"))
-  random_wait <- abs(rnorm(1, 1, 1))
-  # cat(paste("\nWaiting", random_wait, "seconds to be nice to webserver\n"))
-  Sys.sleep(random_wait)
-  result <- GET(url)
-  redis$SET(url,serialize(result, NULL)) # redis didn't have it above
-  return(result)
 }
 
-# package names below, look them up at github.com, e.g. https://github.com/stan-dev/stanc3
- packages = c('stan-dev/stanc3', 'arviz-devs/arviz')
-
-#packages = c('stan-dev/stanc3', 'stan-dev/pystan', 'stan-dev/stan', 
+# package names below, look them up at github.com, 
+# e.g. https://github.com/stan-dev/stanc3 'standev/rstanarm')
+# packages = c('stan-dev/cmdstan', 'stan-dev/stan', 'stan-dev/rstanarm', 
+#             'stan-dev/cmdstanpy')
+packages = c('stan-dev/rstan', 'stan-dev/cmdstanr', 'stan-dev/math', 
+             'stan-dev/cmdstanpy')
+# packages = c('stan-dev/stanc3', 'stan-dev/pystan', 
 
 packageDataDf = data.frame()
 for (i in 1:length(packages)) {
   page = 1L
   while(TRUE) {
     url <- paste('https://api.github.com/repos/', packages[i], 
-              '/pulls?state=all&page=', as.character(page), sep='')
-    result <- get_results(url) #comment out to not cache
-    # result <- serialize(GET(url), NULL)) #uncomment to not cache
-        if (result$status_code == 200) {
+                 '/pulls?state=all&page=', as.character(page), sep='')
+    if (USE_CACHE) {
+        result <- get_results(url)
+    }
+    else {
+      result <- GET(url, config = authenticate(user = USER, 
+                                               password = PERSONAL_TOKEN))
+    }
+    if (result$status_code == 200) {
       jsonTxt <- rawToChar(as.raw(strtoi(result$content, 16L)))
       newDataDf <- jsonlite::fromJSON(jsonTxt)
       n <- nrow(newDataDf)
       newDataLongDf <- data.frame(package = rep(packages[i], n), 
-                           created = as.Date(newDataDf$created_at), 
-                           closed = as.Date(newDataDf$closed_at))
+                                  created = as.Date(newDataDf$created_at), 
+                                  closed = as.Date(newDataDf$closed_at))
       packageDataDf <- rbind(packageDataDf, newDataLongDf)
       if (! str_detect(result$headers$link, 'next')) { #last page
         break
@@ -387,8 +487,8 @@ for (i in 1:length(packages)) {
       # print(sprintf("doing page %d", page))
     }
     else {
-      print(result$status_code)
-      break
+      print(paste("Error", result))
+      stop()
     }
   }
 }
@@ -397,26 +497,28 @@ packageDataDf$age <- packageDataDf$closed - packageDataDf$created
 
 for (i in 1:length(packages)) {
   print(sprintf("package %s has %d closed pull requests, mean age to closure of %.0f days",
-        packages[i],
-        nrow(packageDataDf[packageDataDf$package == packages[i] &
-                           !is.na(packageDataDf$closed),]),
-        mean(packageDataDf[packageDataDf$package == packages[i] &
-                             !is.na(packageDataDf$closed),]$age)))
+                packages[i],
+                nrow(packageDataDf[packageDataDf$package == packages[i] &
+                                     !is.na(packageDataDf$closed),]),
+                mean(packageDataDf[packageDataDf$package == packages[i] &
+                                     !is.na(packageDataDf$closed),]$age)))
   
-  print(sprintf("package %s has %d open pull requests, mean age of %.0f days from May 6, 2021",
+  print(sprintf("package %s has %d open pull requests, mean age of %.0f days from %s",
                 packages[i],
                 nrow(packageDataDf[packageDataDf$package == packages[i] &
                                      is.na(packageDataDf$closed),]),
                 mean(today(tzone = "UTC") - 
                        packageDataDf[packageDataDf$package == packages[i] &
-                                     is.na(packageDataDf$closed),]$created)))
+                                       is.na(packageDataDf$closed),]$created),
+                today(tzone = "UTC")))
 }
 
+rm(list = ls()) #cleanup
 ```
 
 # CRAN downloads
 
-
+Plot downloads from Rstudio's CRAN mirror for specified packages. Baseline packages included to chart relative growth. 
 
 ```{r}
 library(cranlogs)
@@ -439,12 +541,12 @@ dls <- cran_downloads(
   to = "2021-04-30"
 )
 
-# do baseline label on Rccp/ggplot2
-mls <- dls %>% mutate(month=floor_date(date,"monthly")) %>% 
-  group_by(month,package)  %>% #?? order matters for month/package??
+# map to month from day data
+mls <- dls %>% mutate(month=floor_date(date, "monthly")) %>% 
+  group_by(month,package)  %>% 
   summarize(monthly_downloads=sum(count))
 
-# mls data check
+# mls data check, don't trust the above
  mls_val = (mls %>% filter(package=='rstan') %>%
             filter(month=='2018-02-01'))$monthly_downloads 
  
@@ -456,7 +558,6 @@ mls <- dls %>% mutate(month=floor_date(date,"monthly")) %>%
                       "mls_val=%d and more simply computed monthly total dls_val=%d to be equal"),
    mls_val, dls_val))
  }
- 
 
 label_month <- max(mls$month)
 mls_label <- mls %>% 
@@ -492,21 +593,6 @@ log_plot1_2024_slopes_display <- log_plot1_2024_scale +
   geom_label_repel(aes(label = label), na.rm = TRUE) +
          scale_color_discrete(guide = FALSE)
 
-for (package_name in unique(mls$package[1:7])) {
-  entry <- mls[mls$package==package_name,]
-#  print(package_name)
-#  print(lm(pmax(0,log(entry$monthly_downloads))~entry$month))
-  
-  
-}
-
-  
-
-
-
-```
-
-```{r include = TRUE}
 print(log_plot1_2024_slopes_display)
 ```
 
