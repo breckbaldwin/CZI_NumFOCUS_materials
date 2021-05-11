@@ -213,7 +213,7 @@ write.csv(
 
 Two files are created named after the query,  `scopus_data/jupyter.csv` and `scopus_data/jupyter_long.csv` with results. Not clear what happens with complex queries regarding the file system. 
 
-Summing over the categories yields the total counts per year, summing over years yeilds total counts overall. 
+ **Note that the same article can be counted in more than one subject category**
 
 Processing continues below where I filter for biomedicine categories:
 
@@ -302,7 +302,7 @@ rm(list = ls()) #clean up environment
 
 ```
 
-Annual count of Scopus subject categories for the query "jupyter" with total counts across biomedicine subject categories. Note that the same article can be counted in more than one subject category. 
+Annual count of Scopus subject categories for the query "jupyter" with total counts across biomedicine subject categories. **Note that the same article can be counted in more than one subject category**. 
   
   
 ## PyPi downloads
