@@ -1,7 +1,7 @@
 ---
 title: "Resources for CZI Proposals for NumFOCUS projects"
 author: "Breck Baldwin"
-date: "5/6/2021"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: html_document
 ---
 
@@ -13,13 +13,15 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE
 
 I have spent a ton of time doing metrics for open source scientific software as part of my job at Columbia. Stan has been the focus since Columbia contributes to much of the ecosystem but it includes tracking other software as a counter point for grant proposals and progress reports. I'd like to see these metrics used more broadly if it helps people write better proposals. I am currently working on the Chan Zuckerberg Initiative (CZI) [https://chanzuckerberg.com/wp-content/uploads/2021/03/EOSS-4-Combined-RFA-Packet.pdf](https://chanzuckerberg.com/wp-content/uploads/2021/03/EOSS-4-Combined-RFA-Packet.pdf) on behalf of the Stan organization and it looks like many other NumFOCUS projects are applying as well. This document is for them. 
 
+## Some context
+
 In January of 2021 NASA had an open source infrastructure call for proposals and the Stan org joined up with PyMC and ArviZ since we all play in the Bayesian space. So why not do it together? I didn't want to get the funds at the expense of PyMC and ArviZ since we are all on the same team. Towards the end of the NASA effort it became clear that around 10 proposals were coming out of NumFOCUS--isn't AstroPy also on my team too? It made me uncomfortable.
 
 The NASA proposal was a solid month's work and I had the privilege of being able to hit it pretty much full time due to my boss's generosity (Andrew Gelman). I was using Columbia resources to support the Stan org at NumFOCUS and Columbia only indirectly benefits from Stan org funding. I had a think about our competitive advantage due to my having the cycles to focus exclusively on getting a good pitch and then I had a thunk: resources beget more resources to the expense of those without resources and here I am competing with organizations that I have no interest in 'defeating' in the funding game. 
 
 In response to my 'thunk' I decided to create this repo with my metrics to hopefully help other NumFOCUS projects for CZI. Sorry, they are in R but that is the language I am trying to learn but it is all pretty simple stuff, just a hassle to sort out queries, API access etc that take more time than I am willing to admit. It also represents what 'worked', many things were tried--looking at you Google scholar and your lack of an API and way to retrieve results without getting locked out. I also tried many high level access packages that inevitably lacked some feature or information I wanted so all the code is pretty low level `GET` interactions but that level of control is worth it and has become my starting place. 
 
-So in short I am not accepting the zero-sum basis of scientific funding and I don't want to compete with my NumFOCUS neighbors. Maybe CZI allocates more funds because of all of the compelling proposals and excellent metrics justifying the projects. Also I'd like the scientists to keep sciencing, not scraping the web for impact data to support their work. 
+So in short I am not accepting the zero-sum basis of scientific funding and I don't want to compete with my NumFOCUS neighbors. Maybe CZI allocates more funds because of all of the compelling proposals and excellent metrics justifying the projects. How about a threshold system of funding meaning that all proposals above an evaluation threshold are funded or if there are limited funds then the above threshold awards are selected randomly. Totally ordering the relative merit of proposals or 'going by gut' are does not appeal. How about assigning 50% as I suggest and see how well they do over time vs the more standard process. 
 
 ## Navigation and communication
 
@@ -300,7 +302,7 @@ rm(list = ls()) #clean up environment
 
 ```
 
-Annual count of Scopus subject categories for the query "jupyter" with total counts across biomedicine subject categories. 
+Annual count of Scopus subject categories for the query "jupyter" with total counts across biomedicine subject categories. Note that the same article can be counted in more than one subject category. 
   
   
 ## PyPi downloads
