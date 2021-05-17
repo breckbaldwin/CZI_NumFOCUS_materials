@@ -401,6 +401,7 @@ Format of 'github_credentials.json'
 Make that file a sibling of the Rscript or this page and you should be good. 
 
 ```{r eval = TRUE, echo = TRUE}
+rm(list = ls()) #cleanup
 library(httr) # web access
 library(jsonlite) #json processing
 library(stringr) #regex
@@ -515,8 +516,194 @@ for (i in 1:length(packages)) {
                 today(tzone = "UTC")))
 }
 
-rm(list = ls()) #cleanup
+print(sprintf("Across all packages mean aging to closure is %.0f days", 
+              mean(packageDataDf$age, na.rm = TRUE)))
+print(sprintf("All packages mean open PR length is %.0f days from %s",
+                mean(today(tzone = "UTC") - 
+                       packageDataDf[is.na(packageDataDf$closed),]$created),
+                today(tzone = "UTC")))
+
+
+
+
+
 ```
+Super ugly code that I used to get aging graphing going. Just saving it for later. 
+
+```{r}
+rm(list = ls())
+library(httr) # web access
+library(jsonlite) #json processing
+library(stringr) #regex
+library(lubridate) #date
+
+USE_CACHE = TRUE #will have to setup a redis server
+REPORT_PROGRESS = TRUE
+
+credentials <- read_json('github_credentials.json')
+PERSONAL_TOKEN <- credentials$PERSONAL_TOKEN
+USER <- credentials$USER
+# Format of github_credentials.json
+# {
+# "PERSONAL_TOKEN":"XXXXXXXXXXXXXXXXXXXXXXXXxx",
+# "USER":"XXXXXXXXXXXXXXXXXXXXXX"
+# }
+# get your token at:
+# https://github.com/settings/tokens
+# you want to check the 'public repo access' at least. 
+# }
+
+if (USE_CACHE) {
+  library(redux)
+  redis <- redux::hiredis()
+  get_results <- function(url) {
+    cache <- redis$GET(url) # check redis first
+    if (!is.null(cache)) {
+      result <- unserialize(cache)
+      if (result$status_code == 200) {
+        if (REPORT_PROGRESS) {
+          cat(paste("\nhitting redis for", url))
+        }
+        return(result)
+      }
+    }
+    random_wait <- abs(rnorm(1, 1, 1))
+    if (REPORT_PROGRESS) {
+      cat(paste("\ncache miss, querying:", url, "\n"))
+      cat(paste(
+        "\nWaiting",
+        random_wait,
+        "seconds to be nice to webserver\n"
+      ))
+    }
+    Sys.sleep(random_wait)
+    result <- GET(url, config = authenticate(user = USER, 
+                                             password = PERSONAL_TOKEN))
+    redis$SET(url, serialize(result, NULL))
+    return(result)
+  }
+}
+
+# package names below, look them up at github.com, 
+# e.g. https://github.com/stan-dev/stanc3 'standev/rstanarm')
+packages = c('stan-dev/cmdstan', 'stan-dev/stan', 'stan-dev/rstanarm', 
+             'stan-dev/cmdstanpy')
+packages = c('stan-dev/rstan', 'stan-dev/math', 
+             'stan-dev/stan', 'stan-dev/stanc3', 'stan-dev/pystan',
+             'stan-dev/rstanarm', 'arviz-devs/arviz', 'pymc-devs/pymc3')
+
+#packages =c('pymc-devs/pymc3','stan-dev/rstanarm', 'stan-dev/rstan','arviz-devs/arviz')
+
+#packages = c('stan-dev/rstanarm')
+
+
+packageDataDf = data.frame()
+for (i in 1:length(packages)) {
+  page = 1L
+  while(TRUE) {
+    url <- paste('https://api.github.com/repos/', packages[i], 
+                 '/pulls?state=all&page=', as.character(page), sep='')
+    if (USE_CACHE) {
+        result <- get_results(url)
+    }
+    else {
+      result <- GET(url, config = authenticate(user = USER, 
+                                               password = PERSONAL_TOKEN))
+    }
+    if (result$status_code == 200) {
+      jsonTxt <- rawToChar(as.raw(strtoi(result$content, 16L)))
+      newDataDf <- jsonlite::fromJSON(jsonTxt)
+      n <- nrow(newDataDf)
+      newDataLongDf <- data.frame(package = rep(packages[i], n), 
+                                  created = as.Date(newDataDf$created_at), 
+                                  closed = as.Date(newDataDf$closed_at))
+      packageDataDf <- rbind(packageDataDf, newDataLongDf)
+      if (! str_detect(result$headers$link, 'next')) { #last page
+        break
+      }
+      page <- page + 1
+      # print(sprintf("doing page %d", page))
+    }
+    else {
+      print(paste("Error", result))
+      stop()
+    }
+  }
+}
+
+packageDataDf$age <- packageDataDf$closed - packageDataDf$created
+
+packageDataDf$org = str_extract(packageDataDf$package, "([^/]+)") #get org level
+
+for (org in unique(packageDataDf$org)) {
+  print(sprintf("Organization %s has mean aging to closure of %.0f days for %d PRs", 
+                as.character(org),
+                mean(packageDataDf[packageDataDf$org == org,]$age, na.rm = TRUE),
+                sum(packageDataDf[packageDataDf$org == org,]$count, na.rm = TRUE)))
+
+  print(sprintf("Mean open PR length is %.0f days from %s for %d PRs",
+                mean(today(tzone = "UTC") - 
+                       packageDataDf[packageDataDf$org == org &
+                                    is.na(packageDataDf$closed),]$created),
+                today(tzone = "UTC"),
+                sum(packageDataDf[packageDataDf$org == org & 
+                                     is.na(packageDataDf$closed),]$count)))
+}
+library(tidyverse)
+library(ggrepel)
+
+packageDataDf$floor_date_created = floor_date(packageDataDf$created, 'halfyear')
+packageDataDf$count = 1
+
+packageDataDf = packageDataDf %>% mutate(orgPrStat = if_else(is.na(closed),
+                                                             paste(org,"open",
+                                                                   sep = '_'),
+                                                             paste(org,"closed",
+                                                              sep = '_')))
+
+
+yearlyPackageDf = packageDataDf %>% 
+  group_by(floor_date_created, orgPrStat) %>% 
+  summarize(PR_count = sum(count))
+
+orgLabels = c()
+orgs = unique(yearlyPackageDf$orgPrStat)
+
+for (i in 1:length(orgs)) {
+  orgVal = orgs[i]
+   if (endsWith(orgVal, "closed")) {
+     meanVal = mean(packageDataDf[packageDataDf$orgPrStat == orgVal,]$closed - 
+                    packageDataDf[packageDataDf$orgPrStat == orgVal,]$created)  
+     orgLabels[i] = sprintf("%s: mean days to closure = %.0f", orgVal, meanVal)
+   }
+   else {
+     meanVal = mean(today(tzone = "UTC") - 
+                      packageDataDf[packageDataDf$orgPrStat == orgVal,]$created)
+     orgLabels[i] = sprintf("%s: mean days open = %.0f", orgVal, meanVal)
+   }
+}
+
+agingPlot = ggplot(data = yearlyPackageDf, aes(
+    x = floor_date_created,
+    y = PR_count,
+    group = orgPrStat,
+    color = orgPrStat
+  )) +
+  scale_x_date(limits = as.Date(c(min(yearlyPackageDf$floor_date_created), 
+                                  "2021-01-01"))) + 
+  geom_line() +
+  scale_color_discrete(name = "Organization PR aging",
+                       breaks = orgs,
+                       labels = orgLabels) +
+  labs(x = "Semi-annual PR creation counts",
+       y = "Pull request count"
+  )
+
+print(agingPlot)
+
+```
+
+
 
 # CRAN downloads
 
