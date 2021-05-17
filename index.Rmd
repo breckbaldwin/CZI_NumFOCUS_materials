@@ -538,7 +538,7 @@ library(stringr) #regex
 library(lubridate) #date
 
 USE_CACHE = TRUE #will have to setup a redis server
-REPORT_PROGRESS = TRUE
+REPORT_PROGRESS = FALSE
 
 credentials <- read_json('github_credentials.json')
 PERSONAL_TOKEN <- credentials$PERSONAL_TOKEN
