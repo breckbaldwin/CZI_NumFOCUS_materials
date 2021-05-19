@@ -60,6 +60,7 @@ The subject categories are filtered to be biomedicine relevant which is CZI spec
 The query being run below is 'jupyter', see how that nice 'py' in the middle makes for a nice rigid designator.
 
 ```{r} 
+rm(list = ls())
 library(tidyr)
 library(ggplot2)
 library(dplyr)
@@ -133,7 +134,7 @@ matplotlib_q <- 'matplotlib'
 
 jupyter_q <- 'jupyter'
 
-query = jupyter_q
+query = pymc_arviz_stan_eco_q
 
 years <- year_start:year_end
 scopus.df <- data.frame(years)
@@ -282,8 +283,7 @@ df_long_label_filtered <-
   df_long_label[str_detect(df_long_label$topic, medicine_categories), ]
 
 #plot df_long_label to see all categories
-plot2 <-
-  ggplot(data = df_long_label_filtered, aes(
+plot2 <- ggplot(data = df_long_label_filtered, aes(
     x = years,
     y = yr_count,
     group = topic,
@@ -294,11 +294,12 @@ plot2 <-
   geom_label_repel(aes(label = label),
                    max.overlaps = 17, # adjust to allow for all labels
                    na.rm = TRUE) +
-  scale_color_discrete(guide = FALSE) #removes guide on right
+  scale_color_discrete(guide = FALSE) + #removes guide on right
+  labs(y = "PyMC, Stan, ArviZ articles by topic",
+       caption = "Fig 1: Annual subject counts with totals in Scopus.com") +
+   theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0)))
 
 print(plot2)
-
-rm(list = ls()) #clean up environment
 
 ```
 
@@ -331,6 +332,7 @@ Place resulting .csv file in appropriate folder, I have accumulated some current
 
   
 ```{r}
+rm(list = ls())
 library(ggplot2)
 library(ggrepel)
 library(tidyverse)
@@ -338,13 +340,14 @@ library(stringr)
 
 # this list controls what is displayed
 packagePyPiData = c('data/PyPi/ArviZ-results-20210502-112557.csv', 
-                    'data/PyPi/Keras-results-20210502-132857.csv',
+                 #   'data/PyPi/Keras-results-20210502-132857.csv',
                     'data/PyPi/PyMC3-results-20210502-112819.csv',
-                    'data/PyPi/PyStan-results-20210502-132744.csv',
+                 #   'data/PyPi/PyStan-results-20210502-132744.csv',
                     'data/PyPi/PyTorch-results-20210502-130326.csv',
-                    'data/PyPi/TensorFlow-results-20210502-131806.csv',
-                    'data/PyPi/NumPy-results-20210503-200308.csv',
-                    'data/PyPi/ggplot-results-20210503-201446.csv')
+                    'data/PyPi/TensorFlow-results-20210502-131806.csv'
+                 #   'data/PyPi/NumPy-results-20210503-200308.csv',
+                 #   'data/PyPi/ggplot-results-20210503-201446.csv'
+                 )
 
 # note format for display name extraction: "data/PyPi<display name>-resul...csv"
 packagesPyPi = str_match(packagePyPiData, "data/PyPi/([^-]+)-results.*")[,2]
@@ -380,10 +383,12 @@ pyPiPlot = ggplot(data = pkgLongDf, aes(x = month, y = downloads,
   scale_color_discrete(guide = FALSE) +
   scale_y_continuous(breaks=c(0, 100, 1000, 10000, 100000, 1e+06, 1e+07, 1e+08), 
                      trans = scales::log_trans()) +
-  geom_label_repel(label = pkgLongDf$label, na.rm = TRUE)
-
+  geom_label_repel(label = pkgLongDf$label, na.rm = TRUE) +
+  labs(y = "Package downloads log scale",
+       caption = "Fig 3: PyPi.org monthly downloads of packages") +
+   theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0)))
 print(pyPiPlot)
-rm(list = ls()) #cleanup
+
 ```
 
 Monthly counts of PyPi downloads. 
@@ -538,7 +543,7 @@ library(stringr) #regex
 library(lubridate) #date
 
 USE_CACHE = TRUE #will have to setup a redis server
-REPORT_PROGRESS = FALSE
+REPORT_PROGRESS = TRUE
 
 credentials <- read_json('github_credentials.json')
 PERSONAL_TOKEN <- credentials$PERSONAL_TOKEN
@@ -635,20 +640,6 @@ packageDataDf$age <- packageDataDf$closed - packageDataDf$created
 
 packageDataDf$org = str_extract(packageDataDf$package, "([^/]+)") #get org level
 
-for (org in unique(packageDataDf$org)) {
-  print(sprintf("Organization %s has mean aging to closure of %.0f days for %d PRs", 
-                as.character(org),
-                mean(packageDataDf[packageDataDf$org == org,]$age, na.rm = TRUE),
-                sum(packageDataDf[packageDataDf$org == org,]$count, na.rm = TRUE)))
-
-  print(sprintf("Mean open PR length is %.0f days from %s for %d PRs",
-                mean(today(tzone = "UTC") - 
-                       packageDataDf[packageDataDf$org == org &
-                                    is.na(packageDataDf$closed),]$created),
-                today(tzone = "UTC"),
-                sum(packageDataDf[packageDataDf$org == org & 
-                                     is.na(packageDataDf$closed),]$count)))
-}
 library(tidyverse)
 library(ggrepel)
 
@@ -696,8 +687,11 @@ agingPlot = ggplot(data = yearlyPackageDf, aes(
                        breaks = orgs,
                        labels = orgLabels) +
   labs(x = "Semi-annual PR creation counts",
-       y = "Pull request count"
-  )
+       y = "Pull request count",
+       caption = "Fig 5: Pull Request (PR) aging, closed and open"
+  ) +
+   theme(plot.caption=element_text(size=12, hjust=0, margin=margin(15,0,0,0)))
+
 
 print(agingPlot)
 
@@ -723,6 +717,8 @@ library(ggrepel)
 #https://www.ubuntupit.com/best-r-machine-learning-packages/
 packages <- c('rstan','lme4','Rcpp','randomForest','coda','glmnet','caret','mlr3','e1071','Rpart','KernLab','mlr','arules','mboost')
 packages <- c('ggplot2','lme4','rstan','rstanarm','brms')
+
+packages <- c('rstan','rstanarm','brms')
 
 dls <- cran_downloads(
   packages = packages, 
