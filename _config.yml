@@ -1,0 +1,8 @@
+theme: jekyll-theme-cayman
+title: Welcome to data
+description: CZI nf materials
+url: https://breckbaldwin.github.io
+author: Breck Baldwin
+plugins:
+  - jekyll-seo-tag
+google_analytics: UA-197688669-1
